@@ -22,11 +22,14 @@ export type Database = {
           consultation_fee: number | null
           consultation_notes: string | null
           created_at: string | null
+          diagnosis: string | null
           doctor_id: string
+          doctor_notes: string | null
           follow_up_date: string | null
           hospital_id: string
           id: string
           payment_status: string
+          prescription: string | null
           priority_fee: number | null
           queue_position: number | null
           special_instructions: string | null
@@ -43,11 +46,14 @@ export type Database = {
           consultation_fee?: number | null
           consultation_notes?: string | null
           created_at?: string | null
+          diagnosis?: string | null
           doctor_id: string
+          doctor_notes?: string | null
           follow_up_date?: string | null
           hospital_id: string
           id?: string
           payment_status?: string
+          prescription?: string | null
           priority_fee?: number | null
           queue_position?: number | null
           special_instructions?: string | null
@@ -64,11 +70,14 @@ export type Database = {
           consultation_fee?: number | null
           consultation_notes?: string | null
           created_at?: string | null
+          diagnosis?: string | null
           doctor_id?: string
+          doctor_notes?: string | null
           follow_up_date?: string | null
           hospital_id?: string
           id?: string
           payment_status?: string
+          prescription?: string | null
           priority_fee?: number | null
           queue_position?: number | null
           special_instructions?: string | null

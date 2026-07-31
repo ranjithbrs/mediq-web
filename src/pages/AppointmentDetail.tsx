@@ -301,6 +301,38 @@ const AppointmentDetail = () => {
           </Card>
         )}
 
+        {/* Consultation Details (Read‑only) */}
+        {appointment.diagnosis && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Diagnosis</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm">{appointment.diagnosis}</p>
+            </CardContent>
+          </Card>
+        )}
+        {appointment.prescription && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Prescription</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm">{appointment.prescription}</p>
+            </CardContent>
+          </Card>
+        )}
+        {appointment.doctor_notes && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Doctor Notes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm">{appointment.doctor_notes}</p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Action Buttons */}
         <div className="flex gap-4 mb-6">
           <Button

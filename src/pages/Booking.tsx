@@ -12,7 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Clock, Calendar as CalendarIcon, DollarSign } from "lucide-react";
 import { useDoctorById } from "@/hooks/useDoctors";
 import { useAvailableSlots } from "@/hooks/useTimeSlots";
-import { toLocalDateString, isBeforeToday } from "@/utils/dateUtils";
+import { toLocalDateString, isBeforeToday, getTodayLocalDateString } from "@/utils/dateUtils";
 
 
 const Booking = () => {
@@ -33,6 +33,28 @@ const Booking = () => {
     doctorId || undefined,
     selectedDate ? toLocalDateString(selectedDate) : undefined
   );
+
+  const isToday = selectedDate ? toLocalDateString(selectedDate) === getTodayLocalDateString() : false;
+
+  const isSlotDisabled = (slotTime: string, isBooked: boolean) => {
+    if (isBooked) return true;
+    if (!isToday) return false;
+    if (!slotTime) return true;
+
+    // Parse the slot time "HH:MM:SS" or "HH:MM"
+    const [slotHours, slotMinutes] = slotTime.split(":").map(Number);
+    const slotTimeInMinutes = slotHours * 60 + slotMinutes;
+
+    // Get current local time
+    const now = new Date();
+    const currentHours = now.getHours();
+    const currentMinutes = now.getMinutes();
+    
+    // Add 15 minutes buffer
+    const cutoffTimeInMinutes = currentHours * 60 + currentMinutes + 15;
+
+    return slotTimeInMinutes < cutoffTimeInMinutes;
+  };
   
 
   const doctor = doctorData;
@@ -55,6 +77,15 @@ const Booking = () => {
       toast({
         title: "Incomplete Information",
         description: "Please select both date and time",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isSlotDisabled(selectedTime, false)) {
+      toast({
+        title: "Slot Unavailable",
+        description: "The selected time slot is no longer available. Please select another slot.",
         variant: "destructive",
       });
       return;
@@ -187,7 +218,7 @@ const Booking = () => {
                             variant={selectedTime === slot.slot_time ? "default" : "outline"}
                             className="w-full"
                             onClick={() => setSelectedTime(slot.slot_time)}
-                            disabled={slot.is_booked}
+                            disabled={isSlotDisabled(slot.slot_time, slot.is_booked)}
                           >
                             {slot.slot_time}
                           </Button>
@@ -215,7 +246,7 @@ const Booking = () => {
                             variant={selectedTime === slot.slot_time ? "default" : "outline"}
                             className="w-full"
                             onClick={() => setSelectedTime(slot.slot_time)}
-                            disabled={slot.is_booked}
+                            disabled={isSlotDisabled(slot.slot_time, slot.is_booked)}
                           >
                             {slot.slot_time}
                           </Button>

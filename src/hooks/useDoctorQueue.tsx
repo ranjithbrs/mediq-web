@@ -33,15 +33,24 @@ export const useUpdateConsultationStatus = () => {
       status,
       followUpDate,
       consultationNotes,
+      diagnosis,
+      prescription,
+      doctorNotes,
     }: {
       appointmentId: string;
       status: string;
       followUpDate?: string;
       consultationNotes?: string;
+      diagnosis?: string;
+      prescription?: string;
+      doctorNotes?: string;
     }) => {
       const updateData: Record<string, unknown> = { status };
       if (followUpDate) updateData.follow_up_date = followUpDate;
       if (consultationNotes) updateData.consultation_notes = consultationNotes;
+      if (diagnosis !== undefined) updateData.diagnosis = diagnosis;
+      if (prescription !== undefined) updateData.prescription = prescription;
+      if (doctorNotes !== undefined) updateData.doctor_notes = doctorNotes;
 
       const { error } = await supabase
         .from("appointments")
@@ -106,6 +115,9 @@ export interface AppointmentExtra {
   payment_status: string;
   special_instructions: string | null;
   consultation_notes: string | null;
+  diagnosis: string | null;
+  prescription: string | null;
+  doctor_notes: string | null;
   patient_phone: string | null;
   patient_email: string | null;
   patient_blood_group: string | null;
@@ -128,7 +140,7 @@ export const useDoctorAppointmentsExtra = (
       const { data: appts, error: apptError } = await supabase
         .from("appointments")
         .select(
-          "id, user_id, payment_status, special_instructions, consultation_notes"
+          "id, user_id, payment_status, special_instructions, consultation_notes, diagnosis, prescription, doctor_notes"
         )
         .eq("doctor_id", doctorId)
         .eq("appointment_date", targetDate);
@@ -162,6 +174,9 @@ export const useDoctorAppointmentsExtra = (
           payment_status: appt.payment_status ?? "pending",
           special_instructions: appt.special_instructions ?? null,
           consultation_notes: appt.consultation_notes ?? null,
+          diagnosis: appt.diagnosis ?? null,
+          prescription: appt.prescription ?? null,
+          doctor_notes: appt.doctor_notes ?? null,
           patient_phone: profile?.phone ?? null,
           patient_email: profile?.email ?? null,
           patient_blood_group: profile?.blood_group ?? null,

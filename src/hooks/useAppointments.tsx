@@ -15,6 +15,9 @@ export interface Appointment {
   token_number: number | null;
   queue_position: number | null;
   special_instructions: string | null;
+  diagnosis?: string | null;
+  prescription?: string | null;
+  doctor_notes?: string | null;
   created_at: string | null;
   updated_at: string | null;
 }

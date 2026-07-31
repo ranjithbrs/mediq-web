@@ -420,6 +420,9 @@ interface AppointmentCardProps {
     payment_status: string;
     special_instructions: string | null;
     consultation_notes: string | null;
+    diagnosis: string | null;
+    prescription: string | null;
+    doctor_notes: string | null;
     patient_phone: string | null;
     patient_email: string | null;
     patient_blood_group: string | null;
@@ -556,8 +559,26 @@ const AppointmentCard = ({ item, extra, onStart, onComplete, onCancel, isUpdatin
             )}
             {extra?.consultation_notes && (
               <div className="bg-emerald-50 rounded-lg px-3 py-2">
-                <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wide mb-0.5">Consultation Notes</p>
+                <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wide mb-0.5">Consultation Notes / Instructions</p>
                 <p className="text-xs text-emerald-700 font-medium">{extra.consultation_notes}</p>
+              </div>
+            )}
+            {extra?.diagnosis && (
+              <div className="bg-indigo-50 rounded-lg px-3 py-2">
+                <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wide mb-0.5">Diagnosis</p>
+                <p className="text-xs text-indigo-700 font-medium">{extra.diagnosis}</p>
+              </div>
+            )}
+            {extra?.prescription && (
+              <div className="bg-purple-50 rounded-lg px-3 py-2">
+                <p className="text-[10px] font-bold text-purple-600 uppercase tracking-wide mb-0.5">Prescription</p>
+                <p className="text-xs text-purple-700 font-medium whitespace-pre-wrap">{extra.prescription}</p>
+              </div>
+            )}
+            {extra?.doctor_notes && (
+              <div className="bg-teal-50 rounded-lg px-3 py-2">
+                <p className="text-[10px] font-bold text-teal-600 uppercase tracking-wide mb-0.5">Doctor Notes</p>
+                <p className="text-xs text-teal-700 font-medium whitespace-pre-wrap">{extra.doctor_notes}</p>
               </div>
             )}
           </div>
@@ -581,6 +602,9 @@ const DoctorDashboard = () => {
   const [cancelDialog, setCancelDialog]           = useState<string | null>(null);
   const [followUpDate, setFollowUpDate]           = useState("");
   const [consultationNotes, setConsultationNotes] = useState("");
+  const [diagnosis, setDiagnosis]                 = useState("");
+  const [prescription, setPrescription]           = useState("");
+  const [doctorNotes, setDoctorNotes]             = useState("");
 
   const { data: queue = [], isLoading: queueLoading } = useDoctorQueue(doctorProfile?.id, selectedDate);
   const { data: statistics }    = useDoctorStatistics(doctorProfile?.id);
@@ -626,12 +650,30 @@ const DoctorDashboard = () => {
     setCompleteDialog(id);
     setFollowUpDate("");
     setConsultationNotes("");
+    setDiagnosis("");
+    setPrescription("");
+    setDoctorNotes("");
+
+    // Initialize notes from extraMap if they exist
+    const extra = extraMap[id] || {};
+    setConsultationNotes(extra.consultation_notes || "");
+    setDiagnosis(extra.diagnosis || "");
+    setPrescription(extra.prescription || "");
+    setDoctorNotes(extra.doctor_notes || "");
   };
 
   const handleCompleteConsultation = () => {
     if (!completeDialog) return;
     updateStatus.mutate(
-      { appointmentId: completeDialog, status: "completed", followUpDate: followUpDate || undefined, consultationNotes: consultationNotes || undefined },
+      { 
+        appointmentId: completeDialog, 
+        status: "completed", 
+        followUpDate: followUpDate || undefined, 
+        consultationNotes: consultationNotes || undefined,
+        diagnosis: diagnosis || undefined,
+        prescription: prescription || undefined,
+        doctorNotes: doctorNotes || undefined
+      },
       { onSuccess: () => setCompleteDialog(null) }
     );
   };
@@ -888,10 +930,22 @@ const DoctorDashboard = () => {
               Complete Consultation
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 pt-1">
+          <div className="space-y-4 pt-1 max-h-[60vh] overflow-y-auto px-1">
             <div className="space-y-1.5">
-              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Consultation Notes</Label>
-              <Textarea value={consultationNotes} onChange={(e) => setConsultationNotes(e.target.value)} placeholder="Brief notes about the consultation..." rows={3} className="resize-none rounded-xl text-sm border-gray-200 focus-visible:ring-indigo-500" />
+              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Diagnosis</Label>
+              <Textarea value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} placeholder="Enter diagnosis details..." rows={2} className="resize-none rounded-xl text-sm border-gray-200 focus-visible:ring-indigo-500" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Prescription</Label>
+              <Textarea value={prescription} onChange={(e) => setPrescription(e.target.value)} placeholder="Enter prescribed medicines, dosage, instructions..." rows={3} className="rounded-xl text-sm border-gray-200 focus-visible:ring-indigo-500" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Doctor Notes</Label>
+              <Textarea value={doctorNotes} onChange={(e) => setDoctorNotes(e.target.value)} placeholder="Any additional internal/private notes..." rows={2} className="resize-none rounded-xl text-sm border-gray-200 focus-visible:ring-indigo-500" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Consultation Notes / Instructions</Label>
+              <Textarea value={consultationNotes} onChange={(e) => setConsultationNotes(e.target.value)} placeholder="General notes or patient-facing instructions..." rows={2} className="resize-none rounded-xl text-sm border-gray-200 focus-visible:ring-indigo-500" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">
@@ -901,7 +955,7 @@ const DoctorDashboard = () => {
             </div>
             
             {/* Patient Documents empty state refined */}
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 pb-2">
               <Label className="text-xs font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
                 <FileText className="h-4 w-4 text-gray-400" />
                 Patient Documents
