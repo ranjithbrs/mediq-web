@@ -11,10 +11,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Users, Ticket, DollarSign, TrendingUp, CalendarCheck, Crown, Siren, MapPin, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
+import { getTodayLocalDateString } from "@/utils/dateUtils";
 
 const AdminDashboard = () => {
   const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split("T")[0]
+    getTodayLocalDateString()
   );
   const { data: revenue, isLoading: revenueLoading } = useRevenueSummary(selectedDate);
   const { data: followups = [], isLoading: followupsLoading } = useUpcomingFollowups(14);

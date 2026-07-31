@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,6 +52,17 @@ const Emergency = () => {
   const [searchingManual, setSearchingManual] = useState(false);
   const [manualSearchUsed, setManualSearchUsed] = useState(false);
 
+  const manualQueryRef = useRef(manualQuery);
+  const manualSearchUsedRef = useRef(manualSearchUsed);
+
+  useEffect(() => {
+    manualQueryRef.current = manualQuery;
+  }, [manualQuery]);
+
+  useEffect(() => {
+    manualSearchUsedRef.current = manualSearchUsed;
+  }, [manualSearchUsed]);
+
   const searchByPincodeOrCity = async () => {
     const query = manualQuery.trim();
     if (!query) return;
@@ -92,6 +103,11 @@ const Emergency = () => {
         timeout: 10000
       });
 
+      if (manualSearchUsedRef.current || manualQueryRef.current.trim()) {
+        console.log("Background location fetch ignored: user manually searched or is typing.");
+        return;
+      }
+
       setLocation({
         lat: position.coords.latitude,
         lng: position.coords.longitude
@@ -105,13 +121,48 @@ const Emergency = () => {
         const pos: any = await new Promise((resolve, reject) => {
           navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 5000 });
         });
+
+        if (manualSearchUsedRef.current || manualQueryRef.current.trim()) return;
+
         setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
       } catch (fallbackError) {
-        toast({ 
-          title: "Location Error", 
-          description: "Unable to get your location. Please check your GPS settings.", 
-          variant: "destructive" 
-        });
+        console.error("Web location error:", fallbackError);
+
+        // Fallback to IP geolocation if both web and capacitor geolocation fail
+        try {
+          if (manualSearchUsedRef.current || manualQueryRef.current.trim()) return;
+
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+          const res = await fetch("https://ipapi.co/json/", { signal: controller.signal });
+          clearTimeout(timeoutId);
+
+          const ipData = await res.json();
+
+          if (manualSearchUsedRef.current || manualQueryRef.current.trim()) return;
+
+          if (ipData.latitude && ipData.longitude) {
+            setLocation({ lat: ipData.latitude, lng: ipData.longitude });
+            setManualSearchUsed(true);
+            toast({
+              title: "Approximate Location",
+              description: "Using your approximate location based on your network. Results may not be exact."
+            });
+            return;
+          }
+          throw new Error("Invalid IP location response data");
+        } catch (ipError) {
+          console.error("IP location fallback failed:", ipError);
+          
+          if (manualSearchUsedRef.current || manualQueryRef.current.trim()) return;
+
+          toast({ 
+            title: "Location Error", 
+            description: "Location unavailable. Please enter a city or pincode manually.", 
+            variant: "destructive" 
+          });
+        }
       }
     } finally {
       setLocating(false);
@@ -271,7 +322,7 @@ const Emergency = () => {
             {locating ? (
               <>
                 <Loader2 className="h-5 w-5 animate-spin text-destructive" />
-                <span className="text-sm font-medium">Detecting your location...</span>
+                <span className="text-sm font-medium">Finding your location...</span>
               </>
             ) : location ? (
               <>

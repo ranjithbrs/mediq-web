@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { QuickActions } from "@/components/home/QuickActions";
 import { SearchBar } from "@/components/home/SearchBar";
@@ -7,12 +8,12 @@ import { useProfileCompletion } from "@/hooks/useProfileCompletion";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Stethoscope, CalendarCheck } from "lucide-react";
+import { Shield, Stethoscope, CalendarCheck, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
+import { getTodayLocalDateString, formatDisplayDate } from "@/utils/dateUtils";
 
 const PatientFollowUp = ({ userId }: { userId: string }) => {
   const { data: nextFollowUp } = useQuery({
@@ -23,7 +24,7 @@ const PatientFollowUp = ({ userId }: { userId: string }) => {
         .select("follow_up_date, doctors:doctors(name)")
         .eq("user_id", userId)
         .not("follow_up_date", "is", null)
-        .gte("follow_up_date", new Date().toISOString().split("T")[0])
+        .gte("follow_up_date", getTodayLocalDateString())
         .order("follow_up_date", { ascending: true })
         .limit(1)
         .maybeSingle();
@@ -42,7 +43,7 @@ const PatientFollowUp = ({ userId }: { userId: string }) => {
           <p className="text-sm font-medium">Next Follow-up Visit</p>
           <p className="text-xs text-muted-foreground">
             Dr. {(nextFollowUp.doctors as any)?.name} �{" "}
-            {format(new Date(nextFollowUp.follow_up_date!), "MMM dd, yyyy")}
+            {formatDisplayDate(nextFollowUp.follow_up_date!)}
           </p>
         </div>
         <Badge variant="outline">Upcoming</Badge>
@@ -56,6 +57,20 @@ const Index = () => {
   const { isAdmin, isDoctor, user, loading } = useUserRole();
   const navigate = useNavigate();
   const { user: authUser } = useAuth();
+
+  useEffect(() => {
+    if (!loading && isDoctor) {
+      navigate("/doctor-dashboard", { replace: true });
+    }
+  }, [isDoctor, loading, navigate]);
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const hour = new Date().getHours();
   const greeting =

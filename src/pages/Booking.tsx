@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Clock, Calendar as CalendarIcon, DollarSign } from "lucide-react";
 import { useDoctorById } from "@/hooks/useDoctors";
 import { useAvailableSlots } from "@/hooks/useTimeSlots";
+import { toLocalDateString, isBeforeToday } from "@/utils/dateUtils";
 
 
 const Booking = () => {
@@ -30,7 +31,7 @@ const Booking = () => {
   const { data: doctorData, isLoading: doctorLoading } = useDoctorById(doctorId || undefined);
   const { data: availableSlots = [], isLoading: slotsLoading } = useAvailableSlots(
     doctorId || undefined,
-    selectedDate?.toISOString().split('T')[0]
+    selectedDate ? toLocalDateString(selectedDate) : undefined
   );
   
 
@@ -70,7 +71,7 @@ const Booking = () => {
           doctorSpecialization: doctor.specialization,
           hospitalId: hospital.id,
           hospitalName: hospital.name,
-          appointmentDate: selectedDate.toISOString().split('T')[0],
+          appointmentDate: toLocalDateString(selectedDate),
           appointmentTime: selectedTime,
           appointmentType: appointmentType,
           tokenType: tokenType,
@@ -144,7 +145,7 @@ const Booking = () => {
               mode="single"
               selected={selectedDate}
               onSelect={setSelectedDate}
-              disabled={(date) => date < new Date() || date < new Date(new Date().setHours(0, 0, 0, 0))}
+              disabled={(date) => isBeforeToday(date)}
               className="rounded-md border w-full"
             />
           </CardContent>

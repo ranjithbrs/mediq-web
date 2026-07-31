@@ -8,16 +8,22 @@ export const useUserRole = () => {
   const { user, loading: authLoading } = useAuth();
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastUserId, setLastUserId] = useState<string | null>(null);
+
+  const isTransitioning = user && lastUserId !== user.id;
 
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
       setRoles([]);
       setLoading(false);
+      setLastUserId(null);
       return;
     }
 
     const fetchRoles = async () => {
+      setLoading(true);
+      setLastUserId(user.id);
       const { data, error } = await supabase
         .from("user_roles")
         .select("role")
@@ -37,5 +43,5 @@ export const useUserRole = () => {
   const isDoctor = hasRole("doctor");
   const isPatient = hasRole("patient");
 
-  return { roles, loading: loading || authLoading, hasRole, isAdmin, isDoctor, isPatient, user };
+  return { roles, loading: loading || authLoading || isTransitioning, hasRole, isAdmin, isDoctor, isPatient, user };
 };

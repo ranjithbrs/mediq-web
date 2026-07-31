@@ -1,12 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getTodayLocalDateString } from "@/utils/dateUtils";
 
 export const useRevenueSummary = (date?: string) => {
   return useQuery({
     queryKey: ["revenue-summary", date],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_revenue_summary", {
-        p_date: date || new Date().toISOString().split("T")[0],
+        p_date: date || getTodayLocalDateString(),
       });
       if (error) throw error;
       return data?.[0] || {

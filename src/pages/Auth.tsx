@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { Loader2, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useUserRole } from "@/hooks/useUserRole";
 import { useAuth } from "@/hooks/useAuth";
 
 // Password schema following NIST/OWASP recommendations (8+ chars with complexity)
@@ -42,12 +43,9 @@ const Auth = () => {
   
   const isRecovery = searchParams.get("recovery") === "true";
 
-  useEffect(() => {
-    if (!loading && user && !isRecovery) {
-      navigate("/");
-    }
-  }, [user, loading, isRecovery, navigate]);
-  
+  const { isDoctor, loading: roleLoading } = useUserRole();
+
+  // All useState calls must be declared before any conditional returns (Rules of Hooks)
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
@@ -77,6 +75,24 @@ const Auth = () => {
   // Forgot password state
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
+
+  useEffect(() => {
+    if (!loading && !roleLoading && user && !isRecovery) {
+      if (isDoctor) {
+        navigate("/doctor-dashboard", { replace: true });
+      } else {
+        navigate("/", { replace: true });
+      }
+    }
+  }, [user, loading, roleLoading, isDoctor, isRecovery, navigate]);
+
+  if (loading || (user && !isRecovery && roleLoading)) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,11 +145,25 @@ const Auth = () => {
         return;
       }
 
+      // Fetch user role to redirect correctly
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", data.user.id);
+
+      const roles = roleData?.map((r: any) => r.role) || [];
+      const isDoc = roles.includes("doctor");
+
       toast({
         title: "Success",
         description: "Logged in successfully!",
       });
-      navigate("/");
+
+      if (isDoc) {
+        navigate("/doctor-dashboard", { replace: true });
+      } else {
+        navigate("/", { replace: true });
+      }
     } catch (error) {
       if (error instanceof z.ZodError) {
         toast({
