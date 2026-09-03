@@ -89,6 +89,7 @@ const Profile = () => {
   }
 
   const fullName = profile?.full_name || user.user_metadata?.full_name || "User";
+  const avatarUrl = profile?.avatar_url || user.user_metadata?.avatar_url || "";
   const email = user.email || "";
   const phone = profile?.phone || "Not set";
   const address = profile?.address || "Not set";
@@ -99,6 +100,12 @@ const Profile = () => {
   const insuranceProvider = profile?.insurance_provider || "Not set";
   const insuranceNumber = profile?.insurance_number || "Not set";
 
+  const emergencyContactName = profile?.emergency_contact || "";
+  const emergencyPhoneNum = profile?.emergency_phone || "";
+  const emergencyDisplay = (emergencyContactName || emergencyPhoneNum)
+    ? `${emergencyContactName}${emergencyContactName && emergencyPhoneNum ? " • " + emergencyPhoneNum : emergencyPhoneNum}`
+    : "Not set";
+
   return (
     <MainLayout>
       <div className="container py-6 max-w-4xl">
@@ -107,9 +114,9 @@ const Profile = () => {
           <CardContent className="pt-6">
             <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
               <Avatar className="h-24 w-24">
-                <AvatarImage src="" alt={fullName} />
+                <AvatarImage src={avatarUrl} alt={fullName} />
                 <AvatarFallback className="text-2xl bg-primary text-primary-foreground">
-                  {fullName.split(" ").map(n => n[0]).join("").toUpperCase()}
+                  {fullName ? fullName.split(" ").map(n => n[0]).join("").toUpperCase() : "U"}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 text-center md:text-left">
@@ -173,7 +180,7 @@ const Profile = () => {
               <Users className="h-4 w-4 text-muted-foreground" />
               <div>
                 <p className="text-sm text-muted-foreground">Emergency Contact</p>
-                <p className="font-medium">Not set</p>
+                <p className="font-medium">{emergencyDisplay}</p>
               </div>
             </div>
           </CardContent>

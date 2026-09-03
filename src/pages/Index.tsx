@@ -15,6 +15,25 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { getTodayLocalDateString, formatDisplayDate } from "@/utils/dateUtils";
 
+// Hook to fetch the authenticated user's profile name from the profiles table
+const useProfileName = (userId: string | undefined) => {
+  const { data } = useQuery({
+    queryKey: ["profile-name", userId],
+    queryFn: async () => {
+      if (!userId) return null;
+      const { data } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", userId)
+        .maybeSingle();
+      return data?.full_name ?? null;
+    },
+    enabled: !!userId,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+  return data;
+};
+
 const PatientFollowUp = ({ userId }: { userId: string }) => {
   const { data: nextFollowUp } = useQuery({
     queryKey: ["patient-followup", userId],
@@ -57,6 +76,8 @@ const Index = () => {
   const { isAdmin, isDoctor, user, loading } = useUserRole();
   const navigate = useNavigate();
   const { user: authUser } = useAuth();
+  // Always call hooks unconditionally (Rules of Hooks)
+  const profileName = useProfileName(authUser?.id);
 
   useEffect(() => {
     if (!loading && isDoctor) {
@@ -75,8 +96,14 @@ const Index = () => {
   const hour = new Date().getHours();
   const greeting =
     hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
-  const displayName =
-    authUser?.user_metadata?.full_name || "there";
+
+  // Prefer profiles.full_name (user-editable), fallback to auth metadata, then "there"
+  const rawDisplayName =
+    profileName ||
+    authUser?.user_metadata?.full_name ||
+    "there";
+  const nameMatch = rawDisplayName.match(/^[\p{L}\s.'-]+/u);
+  const displayName = nameMatch ? nameMatch[0].trim() : rawDisplayName.trim();
 
   return (
     <MainLayout>

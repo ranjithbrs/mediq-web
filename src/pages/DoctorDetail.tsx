@@ -262,13 +262,6 @@ const DoctorDetail = () => {
                   Select a convenient time slot to book your appointment with {doctor.name}
                 </p>
 
-                <div className="p-4 bg-muted rounded-lg text-center">
-                  <Calendar className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">
-                    Calendar booking coming soon
-                  </p>
-                </div>
-
                 <Button 
                   className="w-full" 
                   size="lg"

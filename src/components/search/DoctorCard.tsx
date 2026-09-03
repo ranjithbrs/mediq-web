@@ -12,7 +12,7 @@ interface DoctorCardProps {
   qualification: string;
   experience: number;
   consultationFee: number;
-  rating: number;
+  rating: number | null;
   totalReviews: number;
   availabilityStatus: "available" | "busy" | "offline";
   hospitalName?: string;
@@ -62,7 +62,9 @@ export const DoctorCard = ({
               </div>
               <div className="flex items-center gap-1 bg-success/10 px-2 py-1 rounded">
                 <Star className="h-3 w-3 fill-success text-success" />
-                <span className="font-semibold text-success text-sm">{rating.toFixed(1)}</span>
+                <span className="font-semibold text-success text-sm">
+                  {rating !== null && rating !== undefined ? rating.toFixed(1) : "0.0"}
+                </span>
               </div>
             </div>
             

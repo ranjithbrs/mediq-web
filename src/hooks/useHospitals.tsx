@@ -15,6 +15,9 @@ export interface Hospital {
   images: string[] | null;
   latitude: number | null;
   longitude: number | null;
+  pincode?: string | null;
+  description?: string | null;
+  status?: string | null;
 }
 
 interface UseHospitalsOptions {

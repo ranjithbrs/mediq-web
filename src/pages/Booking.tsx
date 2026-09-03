@@ -9,10 +9,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { Clock, Calendar as CalendarIcon, DollarSign } from "lucide-react";
+import { Clock, Calendar as CalendarIcon, DollarSign, CalendarOff, AlertCircle } from "lucide-react";
 import { useDoctorById } from "@/hooks/useDoctors";
 import { useAvailableSlots } from "@/hooks/useTimeSlots";
-import { toLocalDateString, isBeforeToday, getTodayLocalDateString } from "@/utils/dateUtils";
+import { toLocalDateString, isBeforeToday, getTodayLocalDateString, parseLocalDateString } from "@/utils/dateUtils";
+import { useDoctorLeaves } from "@/hooks/useDoctorLeaves";
 
 
 const Booking = () => {
@@ -29,14 +30,21 @@ const Booking = () => {
   const [specialInstructions, setSpecialInstructions] = useState("");
 
   const { data: doctorData, isLoading: doctorLoading } = useDoctorById(doctorId || undefined);
+  const { data: doctorLeaves = [] } = useDoctorLeaves(doctorId || undefined);
   const { data: availableSlots = [], isLoading: slotsLoading } = useAvailableSlots(
     doctorId || undefined,
     selectedDate ? toLocalDateString(selectedDate) : undefined
   );
 
+  const selectedDateStr = selectedDate ? toLocalDateString(selectedDate) : null;
+  const selectedDateLeave = selectedDateStr
+    ? doctorLeaves.find((l) => l.leave_date === selectedDateStr)
+    : null;
+
   const isToday = selectedDate ? toLocalDateString(selectedDate) === getTodayLocalDateString() : false;
 
   const isSlotDisabled = (slotTime: string, isBooked: boolean) => {
+    if (selectedDateLeave) return true;
     if (isBooked) return true;
     if (!isToday) return false;
     if (!slotTime) return true;
@@ -45,10 +53,17 @@ const Booking = () => {
     const [slotHours, slotMinutes] = slotTime.split(":").map(Number);
     const slotTimeInMinutes = slotHours * 60 + slotMinutes;
 
-    // Get current local time
+    // Get current local time in Asia/Kolkata timezone
     const now = new Date();
-    const currentHours = now.getHours();
-    const currentMinutes = now.getMinutes();
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Kolkata",
+      hour: "numeric",
+      minute: "numeric",
+      hour12: false,
+    });
+    const parts = formatter.formatToParts(now);
+    const currentHours = Number(parts.find(p => p.type === "hour")?.value);
+    const currentMinutes = Number(parts.find(p => p.type === "minute")?.value);
     
     // Add 15 minutes buffer
     const cutoffTimeInMinutes = currentHours * 60 + currentMinutes + 15;
@@ -77,6 +92,15 @@ const Booking = () => {
       toast({
         title: "Incomplete Information",
         description: "Please select both date and time",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (selectedDateLeave) {
+      toast({
+        title: "Doctor On Leave",
+        description: `The doctor is on leave on this date. ${selectedDateLeave.reason ? `Reason: ${selectedDateLeave.reason}` : "Please choose another date."}`,
         variant: "destructive",
       });
       return;
@@ -175,12 +199,38 @@ const Booking = () => {
             <Calendar
               mode="single"
               selected={selectedDate}
-              onSelect={setSelectedDate}
+              onSelect={(date) => {
+                setSelectedDate(date);
+                setSelectedTime("");
+              }}
               disabled={(date) => isBeforeToday(date)}
+              modifiers={{ leave: doctorLeaves.map((l) => parseLocalDateString(l.leave_date)) }}
+              modifiersClassNames={{ leave: "relative after:content-[''] after:absolute after:bottom-0.5 after:left-1/2 after:-translate-x-1/2 after:w-1.5 after:h-1.5 after:bg-red-500 after:rounded-full font-bold text-red-600" }}
               className="rounded-md border w-full"
             />
+            {doctorLeaves.length > 0 && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-3 px-1">
+                <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+                <span>Doctor is on leave on marked dates (red dot)</span>
+              </div>
+            )}
           </CardContent>
         </Card>
+
+        {/* Doctor On Leave Banner */}
+        {selectedDateLeave && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 text-red-800 shadow-sm">
+            <CalendarOff className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+            <div>
+              <h4 className="font-bold text-sm text-red-900">Doctor is On Leave</h4>
+              <p className="text-xs text-red-700 mt-0.5">
+                Dr. {doctor.name} is unavailable on {new Date(parseLocalDateString(selectedDateLeave.leave_date)).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}.
+                {selectedDateLeave.reason && <span className="block mt-1 font-medium">Reason: {selectedDateLeave.reason}</span>}
+              </p>
+              <p className="text-xs text-red-600 mt-1 font-semibold">Please select a different date from the calendar above.</p>
+            </div>
+          </div>
+        )}
 
         {/* Time Selection */}
         <Card className="mb-6">
@@ -378,7 +428,7 @@ const Booking = () => {
           <Button
             className="flex-1"
             onClick={handleBooking}
-            disabled={!selectedDate || !selectedTime}
+            disabled={!selectedDate || !selectedTime || !!selectedDateLeave}
           >
             Proceed to Payment
           </Button>

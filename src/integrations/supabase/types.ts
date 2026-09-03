@@ -196,6 +196,44 @@ export type Database = {
           },
         ]
       }
+      doctor_leaves: {
+        Row: {
+          id: string
+          doctor_id: string
+          leave_date: string
+          reason: string | null
+          leave_type: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          doctor_id: string
+          leave_date: string
+          reason?: string | null
+          leave_type?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          doctor_id?: string
+          leave_date?: string
+          reason?: string | null
+          leave_type?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "doctor_leaves_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: false
+            referencedRelation: "doctors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       emergency_alerts: {
         Row: {
           created_at: string

@@ -71,10 +71,15 @@ import {
   Zap,
   Sparkles,
   HeartPulse,
+  CalendarOff,
+  Trash2,
+  PlusCircle,
 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { toLocalDateString, parseLocalDateString, getTodayLocalDateString } from "@/utils/dateUtils";
 import { useToast } from "@/hooks/use-toast";
+import { useDoctorLeaves, useAddDoctorLeave, useDeleteDoctorLeave } from "@/hooks/useDoctorLeaves";
+import { isBeforeToday } from "@/utils/dateUtils";
 
 // --- Types ---
 
@@ -605,6 +610,8 @@ const DoctorDashboard = () => {
   const [diagnosis, setDiagnosis]                 = useState("");
   const [prescription, setPrescription]           = useState("");
   const [doctorNotes, setDoctorNotes]             = useState("");
+  const [diagnosisTouched, setDiagnosisTouched]   = useState(false);
+  const [prescriptionTouched, setPrescriptionTouched] = useState(false);
 
   const { data: queue = [], isLoading: queueLoading } = useDoctorQueue(doctorProfile?.id, selectedDate);
   const { data: statistics }    = useDoctorStatistics(doctorProfile?.id);
@@ -612,6 +619,38 @@ const DoctorDashboard = () => {
 
   const updateStatus      = useUpdateConsultationStatus();
   const cancelAppointment = useCancelAppointmentByDoctor();
+
+  // ─── Leave management ───────────────────────────────────────────────────────
+  const { data: doctorLeaves = [] } = useDoctorLeaves(doctorProfile?.id);
+  const addLeave    = useAddDoctorLeave();
+  const deleteLeave = useDeleteDoctorLeave();
+  const [leaveReason, setLeaveReason] = useState("");
+
+  const todayString = getTodayLocalDateString();
+  const isOnLeaveToday = doctorLeaves.some((l) => l.leave_date === todayString);
+
+  // Build set of leave dates for calendar highlighting
+  const leaveDateSet = useMemo(() => {
+    const s = new Set<string>();
+    doctorLeaves.forEach((l) => s.add(l.leave_date));
+    return s;
+  }, [doctorLeaves]);
+
+  // Find leave for the currently selected date (if any)
+  const selectedDateLeave = doctorLeaves.find((l) => l.leave_date === selectedDate);
+  const isSelectedDatePast = isBeforeToday(parseLocalDateString(selectedDate));
+
+  const handleMarkLeave = () => {
+    if (!doctorProfile?.id || isSelectedDatePast) return;
+    addLeave.mutate(
+      { doctorId: doctorProfile.id, leaveDate: selectedDate, reason: leaveReason.trim() || undefined },
+      { onSuccess: () => setLeaveReason("") }
+    );
+  };
+
+  const handleRemoveLeave = (leaveId: string) => {
+    deleteLeave.mutate(leaveId);
+  };
 
   const todayStats = useMemo(() => {
     const total      = queue.length;
@@ -653,6 +692,8 @@ const DoctorDashboard = () => {
     setDiagnosis("");
     setPrescription("");
     setDoctorNotes("");
+    setDiagnosisTouched(false);
+    setPrescriptionTouched(false);
 
     // Initialize notes from extraMap if they exist
     const extra = extraMap[id] || {};
@@ -664,14 +705,18 @@ const DoctorDashboard = () => {
 
   const handleCompleteConsultation = () => {
     if (!completeDialog) return;
+    // Client-side validation: diagnosis and prescription are required
+    setDiagnosisTouched(true);
+    setPrescriptionTouched(true);
+    if (!diagnosis.trim() || !prescription.trim()) return;
     updateStatus.mutate(
       { 
         appointmentId: completeDialog, 
         status: "completed", 
         followUpDate: followUpDate || undefined, 
         consultationNotes: consultationNotes || undefined,
-        diagnosis: diagnosis || undefined,
-        prescription: prescription || undefined,
+        diagnosis: diagnosis.trim(),
+        prescription: prescription.trim(),
         doctorNotes: doctorNotes || undefined
       },
       { onSuccess: () => setCompleteDialog(null) }
@@ -763,6 +808,18 @@ const DoctorDashboard = () => {
                     <Star className="h-3.5 w-3.5 text-yellow-300 fill-yellow-300" />
                     Rating: {rating ?? "None"}
                   </div>
+                  {/* Availability Status */}
+                  {isOnLeaveToday ? (
+                    <div className="flex items-center gap-1 bg-red-500/30 backdrop-blur-md rounded-lg px-2.5 py-1 text-white text-[11px] font-semibold border border-red-300/30">
+                      <CalendarOff className="h-3.5 w-3.5 text-red-300" />
+                      🔴 On Leave Today
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 bg-emerald-500/30 backdrop-blur-md rounded-lg px-2.5 py-1 text-white text-[11px] font-semibold border border-emerald-300/30">
+                      <CheckCircle className="h-3.5 w-3.5 text-emerald-300" />
+                      🟢 Available Today
+                    </div>
+                  )}
                   {/* Next Appointment */}
                   {nextAppointmentTime ? (
                     <div className="flex items-center gap-1 bg-white/15 backdrop-blur-md rounded-lg px-2.5 py-1 text-white text-[11px] font-semibold border border-indigo-300/30">
@@ -787,6 +844,8 @@ const DoctorDashboard = () => {
                   selected={parseLocalDateString(selectedDate)}
                   onSelect={(date) => { if (date) setSelectedDate(toLocalDateString(date)); }}
                   className="rounded-md"
+                  modifiers={{ leave: doctorLeaves.map((l) => parseLocalDateString(l.leave_date)) }}
+                  modifiersClassNames={{ leave: "relative after:content-[''] after:absolute after:bottom-0.5 after:left-1/2 after:-translate-x-1/2 after:w-1.5 after:h-1.5 after:bg-red-500 after:rounded-full" }}
                 />
               </CardContent>
               {/* Selected date & summary info displayed compactly below the calendar */}
@@ -799,6 +858,99 @@ const DoctorDashboard = () => {
                   {queue.length} Appt{queue.length !== 1 ? "s" : ""}
                 </span>
               </div>
+            </Card>
+
+            {/* Availability & Leave Management Card */}
+            <Card className="shrink-0 w-full sm:w-72 bg-white rounded-2xl shadow-xl overflow-hidden self-center mx-auto lg:mx-0">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <CalendarOff className="h-4 w-4 text-indigo-600" />
+                  <h3 className="text-sm font-bold text-gray-800">Availability & Leave</h3>
+                </div>
+
+                {/* Selected date status */}
+                <div className="text-xs text-gray-600 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                  <span className="font-semibold">{new Date(parseLocalDateString(selectedDate)).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                  {selectedDateLeave ? (
+                    <span className="ml-2 text-red-600 font-bold">🔴 On Leave</span>
+                  ) : (
+                    <span className="ml-2 text-emerald-600 font-bold">🟢 Available</span>
+                  )}
+                </div>
+
+                {isSelectedDatePast ? (
+                  <p className="text-xs text-muted-foreground italic">Past dates cannot be edited.</p>
+                ) : selectedDateLeave ? (
+                  <div className="space-y-2">
+                    {selectedDateLeave.reason && (
+                      <p className="text-xs text-gray-600"><span className="font-semibold">Reason:</span> {selectedDateLeave.reason}</p>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full h-8 text-xs text-red-600 border-red-200 hover:bg-red-50 rounded-lg gap-1.5 font-semibold"
+                      onClick={() => handleRemoveLeave(selectedDateLeave.id)}
+                      disabled={deleteLeave.isPending}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      {deleteLeave.isPending ? "Removing..." : "Remove Leave"}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Input
+                      placeholder="Reason for leave (optional)"
+                      value={leaveReason}
+                      onChange={(e) => setLeaveReason(e.target.value)}
+                      className="h-8 text-xs rounded-lg border-gray-200"
+                    />
+                    <Button
+                      size="sm"
+                      className="w-full h-8 text-xs bg-indigo-600 hover:bg-indigo-700 rounded-lg gap-1.5 font-semibold"
+                      onClick={handleMarkLeave}
+                      disabled={addLeave.isPending}
+                    >
+                      <PlusCircle className="h-3 w-3" />
+                      {addLeave.isPending ? "Marking..." : "Mark as Leave"}
+                    </Button>
+                  </div>
+                )}
+
+                {/* Legend */}
+                <div className="flex items-center gap-3 text-[10px] text-gray-500 pt-1 border-t border-gray-100">
+                  <span>🔴 Leave</span>
+                  <span>🟢 Available</span>
+                  <span>📅 Selected</span>
+                </div>
+
+                {/* Upcoming Leaves */}
+                {doctorLeaves.length > 0 && (
+                  <div className="space-y-1.5 pt-1 border-t border-gray-100">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Upcoming Leave</p>
+                    <div className="max-h-32 overflow-y-auto space-y-1 pr-1">
+                      {doctorLeaves.map((leave) => (
+                        <div key={leave.id} className="flex items-center justify-between bg-red-50 rounded-lg px-2.5 py-1.5 border border-red-100">
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-red-800">
+                              {new Date(parseLocalDateString(leave.leave_date)).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                            </p>
+                            {leave.reason && (
+                              <p className="text-[10px] text-red-600 truncate">{leave.reason}</p>
+                            )}
+                          </div>
+                          <button
+                            className="shrink-0 p-1 hover:bg-red-100 rounded-md transition-colors"
+                            onClick={() => handleRemoveLeave(leave.id)}
+                            title="Remove leave"
+                          >
+                            <Trash2 className="h-3 w-3 text-red-500" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
             </Card>
           </div>
         </div>
@@ -932,12 +1084,36 @@ const DoctorDashboard = () => {
           </DialogHeader>
           <div className="space-y-4 pt-1 max-h-[60vh] overflow-y-auto px-1">
             <div className="space-y-1.5">
-              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Diagnosis</Label>
-              <Textarea value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} placeholder="Enter diagnosis details..." rows={2} className="resize-none rounded-xl text-sm border-gray-200 focus-visible:ring-indigo-500" />
+              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">
+                Diagnosis <span className="text-red-500">*</span>
+              </Label>
+              <Textarea
+                value={diagnosis}
+                onChange={(e) => setDiagnosis(e.target.value)}
+                onBlur={() => setDiagnosisTouched(true)}
+                placeholder="Enter diagnosis details..."
+                rows={2}
+                className={`resize-none rounded-xl text-sm border-gray-200 focus-visible:ring-indigo-500 ${diagnosisTouched && !diagnosis.trim() ? "border-red-400 focus-visible:ring-red-400" : ""}`}
+              />
+              {diagnosisTouched && !diagnosis.trim() && (
+                <p className="text-xs text-red-500 font-medium">Diagnosis is required.</p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Prescription</Label>
-              <Textarea value={prescription} onChange={(e) => setPrescription(e.target.value)} placeholder="Enter prescribed medicines, dosage, instructions..." rows={3} className="rounded-xl text-sm border-gray-200 focus-visible:ring-indigo-500" />
+              <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">
+                Prescription <span className="text-red-500">*</span>
+              </Label>
+              <Textarea
+                value={prescription}
+                onChange={(e) => setPrescription(e.target.value)}
+                onBlur={() => setPrescriptionTouched(true)}
+                placeholder="Enter prescribed medicines, dosage, instructions..."
+                rows={3}
+                className={`rounded-xl text-sm border-gray-200 focus-visible:ring-indigo-500 ${prescriptionTouched && !prescription.trim() ? "border-red-400 focus-visible:ring-red-400" : ""}`}
+              />
+              {prescriptionTouched && !prescription.trim() && (
+                <p className="text-xs text-red-500 font-medium">Prescription is required.</p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Doctor Notes</Label>
@@ -971,7 +1147,11 @@ const DoctorDashboard = () => {
           </div>
           <DialogFooter className="gap-2 pt-2">
             <Button variant="outline" className="rounded-xl font-semibold border-gray-200" onClick={() => setCompleteDialog(null)}>Cancel</Button>
-            <Button className="rounded-xl bg-emerald-600 hover:bg-emerald-700 font-semibold shadow-sm" onClick={handleCompleteConsultation} disabled={updateStatus.isPending}>
+            <Button
+              className="rounded-xl bg-emerald-600 hover:bg-emerald-700 font-semibold shadow-sm disabled:opacity-50"
+              onClick={handleCompleteConsultation}
+              disabled={updateStatus.isPending}
+            >
               {updateStatus.isPending ? "Saving..." : "Confirm & Save"}
             </Button>
           </DialogFooter>

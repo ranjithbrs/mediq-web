@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,8 @@ const ProfileEdit = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form state
   const [fullName, setFullName] = useState("");
@@ -41,6 +43,7 @@ const ProfileEdit = () => {
   const [insuranceProvider, setInsuranceProvider] = useState("");
   const [insuranceNumber, setInsuranceNumber] = useState("");
   const [insuranceExpiry, setInsuranceExpiry] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
 
   useEffect(() => {
     loadUserData();
@@ -52,18 +55,21 @@ const ProfileEdit = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setEmail(user.email || "");
-        setFullName(user.user_metadata.full_name || "");
+        setFullName(user.user_metadata?.full_name || "");
+        setAvatarUrl(user.user_metadata?.avatar_url || "");
 
         // Load profile data from profiles table
         const { data: profile, error } = await supabase
           .from("profiles")
           .select("*")
           .eq("id", user.id)
-          .single();
+          .maybeSingle();
 
-        if (error && error.code !== "PGRST116") {
+        if (error) {
           console.error("Error loading profile:", error);
         } else if (profile) {
+          if (profile.full_name) setFullName(profile.full_name);
+          if (profile.avatar_url) setAvatarUrl(profile.avatar_url);
           setPhone(profile.phone || "+91 ");
           setAddress(profile.address || "");
           setEmergencyContact(profile.emergency_contact || "");
@@ -85,6 +91,74 @@ const ProfileEdit = () => {
     }
   };
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast({
+        variant: "destructive",
+        title: "Invalid file type",
+        description: "Please select an image file (JPEG, PNG, WEBP, etc.)",
+      });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        variant: "destructive",
+        title: "File too large",
+        description: "Image size must be less than 5MB",
+      });
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No user found");
+
+      const fileExt = file.name.split(".").pop();
+      const filePath = `${user.id}/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) {
+        console.error("Storage upload error:", uploadError);
+        toast({
+          variant: "destructive",
+          title: "Upload Failed",
+          description: `Failed to upload photo: ${uploadError.message}`,
+        });
+        return;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(filePath);
+
+      setAvatarUrl(publicUrl);
+      toast({
+        title: "Photo Uploaded",
+        description: "Profile photo uploaded successfully. Click Save Changes to save your profile.",
+      });
+    } catch (error: any) {
+      console.error("Error uploading avatar:", error);
+      toast({
+        variant: "destructive",
+        title: "Upload Error",
+        description: error.message || "Failed to upload avatar.",
+      });
+    } finally {
+      setIsUploadingPhoto(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -99,20 +173,13 @@ const ProfileEdit = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
-      // Update user metadata
-      const { error: authError } = await supabase.auth.updateUser({
-        data: {
-          full_name: validated.fullName,
-        },
-      });
-
-      if (authError) throw authError;
-
-      // Update profile data in profiles table
+      // Upsert profile data in profiles table (creates record if missing, updates if existing)
       const { error: profileError } = await supabase
         .from("profiles")
-        .update({
+        .upsert({
+          id: user.id,
           full_name: validated.fullName,
+          email: user.email || null,
           phone: validated.phone,
           address: validated.address || null,
           emergency_contact: validated.emergencyContact || null,
@@ -125,17 +192,30 @@ const ProfileEdit = () => {
           insurance_provider: insuranceProvider || null,
           insurance_number: insuranceNumber || null,
           insurance_expiry: insuranceExpiry || null,
-        })
-        .eq("id", user.id);
+          avatar_url: avatarUrl || null,
+          updated_at: new Date().toISOString(),
+        });
 
       if (profileError) throw profileError;
+
+      // Update user auth metadata
+      const { error: authError } = await supabase.auth.updateUser({
+        data: {
+          full_name: validated.fullName,
+          avatar_url: avatarUrl || null,
+        },
+      });
+
+      if (authError) {
+        console.error("Auth metadata update notice:", authError);
+      }
 
       toast({
         title: "Success",
         description: "Profile updated successfully",
       });
       navigate("/profile");
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         toast({
           variant: "destructive",
@@ -143,10 +223,11 @@ const ProfileEdit = () => {
           description: error.errors[0].message,
         });
       } else {
+        console.error("Error updating profile:", error);
         toast({
           variant: "destructive",
           title: "Error",
-          description: "Failed to update profile. Please try again.",
+          description: error?.message || "Failed to update profile. Please try again.",
         });
       }
     } finally {
@@ -186,14 +267,29 @@ const ProfileEdit = () => {
           <CardContent>
             <div className="flex items-center gap-6">
               <Avatar className="h-24 w-24">
-                <AvatarImage src="" alt={fullName} />
+                <AvatarImage src={avatarUrl} alt={fullName} />
                 <AvatarFallback className="text-2xl">
-                  {fullName.split(" ").map(n => n[0]).join("").toUpperCase()}
+                  {fullName ? fullName.split(" ").map(n => n[0]).join("").toUpperCase() : "U"}
                 </AvatarFallback>
               </Avatar>
-              <Button variant="outline">
-                <Upload className="mr-2 h-4 w-4" />
-                Upload Photo
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept="image/*"
+                className="hidden"
+              />
+              <Button
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploadingPhoto || isSaving}
+              >
+                {isUploadingPhoto ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="mr-2 h-4 w-4" />
+                )}
+                {isUploadingPhoto ? "Uploading..." : "Upload Photo"}
               </Button>
             </div>
           </CardContent>

@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
+import { parseLocalDateString } from "@/utils/dateUtils";
 
 interface AppointmentCardProps {
   appointment: {
@@ -93,7 +94,7 @@ export const AppointmentCard = ({ appointment }: AppointmentCardProps) => {
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-1">
             <Calendar className="h-4 w-4" />
-            <span>{format(new Date(appointment.appointment_date), "PP")}</span>
+            <span>{format(parseLocalDateString(appointment.appointment_date), "PP")}</span>
           </div>
           <div className="flex items-center gap-1">
             <Clock className="h-4 w-4" />

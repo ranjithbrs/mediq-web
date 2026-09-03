@@ -56,10 +56,20 @@ const Notifications = () => {
         return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
       case "failed":
         return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
+      case "pending":
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
     }
   };
+
+  // Only show in_app notifications to users.
+  // Email/push rows are backend delivery records and must not surface here —
+  // they carry delivery status ("failed" for email) that is unrelated to
+  // whether the appointment itself succeeded, and would appear contradictory.
+  const inAppNotifications = (notifications ?? []).filter(
+    (n) => n.channel === "in_app"
+  );
 
   return (
     <MainLayout>
@@ -176,9 +186,9 @@ const Notifications = () => {
         <div className="space-y-4">
           <h2 className="text-2xl font-bold">Notification History</h2>
           
-          {notifications && notifications.length > 0 ? (
+          {inAppNotifications.length > 0 ? (
             <div className="space-y-3">
-              {notifications.map((notification) => (
+              {inAppNotifications.map((notification) => (
                 <Card key={notification.id}>
                   <CardContent className="pt-6">
                     <div className="flex items-start justify-between">
@@ -200,11 +210,6 @@ const Notifications = () => {
                             {notification.message}
                           </p>
                           <div className="flex items-center space-x-4 text-xs text-muted-foreground">
-                            <span className="flex items-center space-x-1">
-                              <Badge variant="outline" className="text-xs">
-                                {notification.channel}
-                              </Badge>
-                            </span>
                             <span>
                               {new Date(notification.created_at).toLocaleString()}
                             </span>

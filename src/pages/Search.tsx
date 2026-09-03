@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Search as SearchIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useSearchParams } from "react-router-dom";
 import { useHospitals } from "@/hooks/useHospitals";
 import { useDoctors } from "@/hooks/useDoctors";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 const Search = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -23,16 +25,32 @@ const Search = () => {
   const [selectedCities, setSelectedCities] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState("rating");
   const [searchQuery, setSearchQuery] = useState(queryParam || "");
+  const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
+
+  // Debounce search query to prevent duplicate network calls on every key press
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
   // Sync search query from URL params
   useEffect(() => {
-    if (queryParam) {
+    if (queryParam !== null) {
       setSearchQuery(queryParam);
+      setDebouncedQuery(queryParam);
     }
   }, [queryParam]);
 
+  // Sync specialty param from URL
+  useEffect(() => {
+    setSelectedSpecialties(specialtyParam ? [specialtyParam] : []);
+  }, [specialtyParam]);
+
   const handleSearch = (query: string) => {
     setSearchQuery(query);
+    setDebouncedQuery(query);
     setSearchParams((prev) => {
       if (query) {
         prev.set("q", query);
@@ -44,38 +62,89 @@ const Search = () => {
   };
 
   const { data: hospitals = [], isLoading: hospitalsLoading } = useHospitals({
-    searchText: searchQuery,
+    searchText: debouncedQuery,
     city: selectedCities[0],
     specialty: selectedSpecialties[0],
   });
 
   const { data: doctors = [], isLoading: doctorsLoading } = useDoctors({
-    searchText: searchQuery,
+    searchText: debouncedQuery,
     specialization: selectedSpecialties[0],
   });
 
+  // Query all hospital names to resolve doctor.hospital_id to hospital name in results
+  const { data: allHospitals = [] } = useQuery({
+    queryKey: ["all-hospitals-names"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("hospitals")
+        .select("id, name");
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const hospitalMap = useMemo(() => {
+    return new Map(allHospitals.map((h) => [h.id, h.name]));
+  }, [allHospitals]);
+
   const loading = hospitalsLoading || doctorsLoading;
 
+  // Make filters behave as single-select since RPC filters only handle single values
   const handleSpecialtyToggle = (specialty: string) => {
-    setSelectedSpecialties((prev) =>
-      prev.includes(specialty)
-        ? prev.filter((s) => s !== specialty)
-        : [...prev, specialty]
-    );
+    setSelectedSpecialties((prev) => {
+      const isAlreadySelected = prev.includes(specialty);
+      const newSpecialties = isAlreadySelected ? [] : [specialty];
+      
+      setSearchParams((prevParams) => {
+        if (newSpecialties.length > 0) {
+          prevParams.set("specialty", newSpecialties[0]);
+        } else {
+          prevParams.delete("specialty");
+        }
+        return prevParams;
+      });
+
+      return newSpecialties;
+    });
   };
 
   const handleCityToggle = (city: string) => {
-    setSelectedCities((prev) =>
-      prev.includes(city)
-        ? prev.filter((c) => c !== city)
-        : [...prev, city]
-    );
+    setSelectedCities((prev) => {
+      const isAlreadySelected = prev.includes(city);
+      return isAlreadySelected ? [] : [city];
+    });
   };
 
   const handleClearFilters = () => {
     setSelectedSpecialties([]);
     setSelectedCities([]);
+    setSearchParams((prevParams) => {
+      prevParams.delete("specialty");
+      return prevParams;
+    });
   };
+
+  // Perform sorting in frontend
+  const sortedHospitals = useMemo(() => {
+    const list = [...hospitals];
+    if (sortBy === "rating") {
+      return list.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    } else if (sortBy === "name") {
+      return list.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return list;
+  }, [hospitals, sortBy]);
+
+  const sortedDoctors = useMemo(() => {
+    const list = [...doctors];
+    if (sortBy === "rating") {
+      return list.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    } else if (sortBy === "name") {
+      return list.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return list;
+  }, [doctors, sortBy]);
 
   return (
     <MainLayout>
@@ -120,8 +189,8 @@ const Search = () => {
 
         <Tabs defaultValue="hospitals" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="hospitals">Hospitals ({hospitals.length})</TabsTrigger>
-            <TabsTrigger value="doctors">Doctors ({doctors.length})</TabsTrigger>
+            <TabsTrigger value="hospitals">Hospitals ({sortedHospitals.length})</TabsTrigger>
+            <TabsTrigger value="doctors">Doctors ({sortedDoctors.length})</TabsTrigger>
           </TabsList>
           
           <TabsContent value="hospitals" className="space-y-4">
@@ -129,22 +198,22 @@ const Search = () => {
               Array.from({ length: 3 }).map((_, i) => (
                 <Skeleton key={i} className="h-64 w-full" />
               ))
-            ) : hospitals.length === 0 ? (
+            ) : sortedHospitals.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <p>No hospitals found matching your criteria</p>
               </div>
             ) : (
-              hospitals.map((hospital) => (
+              sortedHospitals.map((hospital) => (
                 <HospitalCard
                   key={hospital.id}
                   id={hospital.id}
                   name={hospital.name}
                   address={hospital.address}
                   city={hospital.city}
-                  specialties={hospital.specialties}
+                  specialties={hospital.specialties || []}
                   rating={hospital.rating}
-                  totalReviews={hospital.total_reviews}
-                  image={hospital.images[0] || "/placeholder.svg"}
+                  totalReviews={hospital.total_reviews || 0}
+                  image={(hospital.images && hospital.images[0]) || "/placeholder.svg"}
                 />
               ))
             )}
@@ -155,12 +224,12 @@ const Search = () => {
               Array.from({ length: 3 }).map((_, i) => (
                 <Skeleton key={i} className="h-48 w-full" />
               ))
-            ) : doctors.length === 0 ? (
+            ) : sortedDoctors.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <p>No doctors found matching your criteria</p>
               </div>
             ) : (
-              doctors.map((doctor) => (
+              sortedDoctors.map((doctor) => (
                 <DoctorCard
                   key={doctor.id}
                   id={doctor.id}
@@ -171,8 +240,9 @@ const Search = () => {
                   experience={doctor.experience}
                   consultationFee={doctor.consultation_fee}
                   rating={doctor.rating}
-                  totalReviews={doctor.total_reviews}
+                  totalReviews={doctor.total_reviews || 0}
                   availabilityStatus={doctor.availability_status as "available" | "busy" | "offline"}
+                  hospitalName={hospitalMap.get(doctor.hospital_id)}
                 />
               ))
             )}

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,15 @@ const HospitalDetail = () => {
   const { data: reviews = [], isLoading: reviewsLoading } = useReviewsByHospital(id);
 
   const loading = hospitalLoading || doctorsLoading || reviewsLoading;
+
+  useEffect(() => {
+    if (!loading && window.location.hash === "#doctors") {
+      const element = document.getElementById("doctors");
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth" });
+      }
+    }
+  }, [loading]);
 
   if (loading) {
     return (
@@ -58,7 +68,7 @@ const HospitalDetail = () => {
         {/* Hospital Header */}
         <div className="relative rounded-lg overflow-hidden">
           <img
-            src={hospital.images[0] || "/placeholder.svg"}
+            src={(hospital.images && hospital.images[0]) || "/placeholder.svg"}
             alt={hospital.name}
             className="w-full h-64 md:h-96 object-cover"
           />
@@ -136,6 +146,7 @@ const HospitalDetail = () => {
                       rating={doctor.rating}
                       totalReviews={doctor.total_reviews}
                       availabilityStatus={doctor.availability_status as "available" | "busy" | "offline"}
+                      hospitalName={hospital.name}
                     />
                   ))
                 )}
@@ -212,7 +223,7 @@ const HospitalDetail = () => {
             </Card>
 
             <Button className="w-full" size="lg" asChild>
-              <Link to="#doctors">Book Appointment</Link>
+              <a href="#doctors">Book Appointment</a>
             </Button>
           </div>
         </div>

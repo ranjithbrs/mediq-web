@@ -18,6 +18,7 @@ import {
   Edit,
   Trash2,
   Download,
+  Stethoscope,
 } from "lucide-react";
 import { generateAppointmentPDF } from "@/components/appointments/AppointmentReceiptPDF";
 import {
@@ -32,6 +33,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
+import { parseLocalDateString } from "@/utils/dateUtils";
 
 const AppointmentDetail = () => {
   const { id } = useParams();
@@ -209,7 +211,7 @@ const AppointmentDetail = () => {
               <div>
                 <p className="text-sm font-medium">Date</p>
                 <p className="text-sm text-muted-foreground">
-                  {format(new Date(appointment.appointment_date), "PPP")}
+                  {format(parseLocalDateString(appointment.appointment_date), "PPP")}
                 </p>
               </div>
             </div>
@@ -301,34 +303,34 @@ const AppointmentDetail = () => {
           </Card>
         )}
 
-        {/* Consultation Details (Read‑only) */}
-        {appointment.diagnosis && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Diagnosis</CardTitle>
+        {/* Consultation Summary (read-only, shown only after completion) */}
+        {appointment.status === "completed" && (appointment.diagnosis || appointment.prescription || appointment.doctor_notes) && (
+          <Card className="mb-6 border-emerald-100 bg-emerald-50/30">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-emerald-800">
+                <Stethoscope className="h-5 w-5 text-emerald-600" />
+                Consultation Summary
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm">{appointment.diagnosis}</p>
-            </CardContent>
-          </Card>
-        )}
-        {appointment.prescription && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Prescription</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm">{appointment.prescription}</p>
-            </CardContent>
-          </Card>
-        )}
-        {appointment.doctor_notes && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Doctor Notes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm">{appointment.doctor_notes}</p>
+            <CardContent className="space-y-4">
+              {appointment.diagnosis && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-emerald-700 mb-1">Diagnosis</p>
+                  <p className="text-sm text-gray-800 whitespace-pre-wrap">{appointment.diagnosis}</p>
+                </div>
+              )}
+              {appointment.prescription && (
+                <div className="border-t border-emerald-100 pt-3">
+                  <p className="text-xs font-bold uppercase tracking-wider text-emerald-700 mb-1">Prescription</p>
+                  <p className="text-sm text-gray-800 whitespace-pre-wrap">{appointment.prescription}</p>
+                </div>
+              )}
+              {appointment.doctor_notes && (
+                <div className="border-t border-emerald-100 pt-3">
+                  <p className="text-xs font-bold uppercase tracking-wider text-emerald-700 mb-1">Doctor Notes</p>
+                  <p className="text-sm text-gray-800 whitespace-pre-wrap">{appointment.doctor_notes}</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

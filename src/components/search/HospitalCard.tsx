@@ -10,7 +10,7 @@ interface HospitalCardProps {
   address: string;
   city: string;
   specialties: string[];
-  rating: number;
+  rating: number | null;
   totalReviews: number;
   image: string;
 }
@@ -47,7 +47,9 @@ export const HospitalCard = ({
               </div>
               <div className="flex items-center gap-1 bg-success/10 px-2 py-1 rounded">
                 <Star className="h-4 w-4 fill-success text-success" />
-                <span className="font-semibold text-success">{rating.toFixed(1)}</span>
+                <span className="font-semibold text-success">
+                  {rating !== null && rating !== undefined ? rating.toFixed(1) : "0.0"}
+                </span>
                 <span className="text-xs text-muted-foreground">({totalReviews})</span>
               </div>
             </div>

@@ -9,6 +9,7 @@ import { RoleBasedRoute } from "@/components/auth/RoleBasedRoute";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { Loader2 } from "lucide-react";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { useEffect } from "react";
@@ -22,17 +23,20 @@ const BackButtonHandler = () => {
   useEffect(() => {
     // Configure status bar for immersive look
     const setupStatusBar = async () => {
+  // StatusBar is only available on native Android/iOS
+      if (!Capacitor.isNativePlatform()) return;
+
       try {
         await StatusBar.show();
         await StatusBar.setStyle({ style: Style.Default });
-        await StatusBar.setBackgroundColor({ color: '#ffffff' }); // Ensure it's white to be visible
+        await StatusBar.setBackgroundColor({ color: "#ffffff" });
         await StatusBar.setOverlaysWebView({ overlay: true });
       } catch (e) {
-        console.warn("StatusBar plugin not available", e);
+        console.warn("StatusBar setup failed:", e);
       }
     };
-    setupStatusBar();
 
+    setupStatusBar();
     const handler = CapacitorApp.addListener('backButton', ({ canGoBack }) => {
       if (location.pathname === '/') {
         // Exit app if on home page

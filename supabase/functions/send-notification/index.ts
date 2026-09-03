@@ -22,6 +22,30 @@ interface NotificationRequest {
   };
 }
 
+// ─── Duplicate Prevention ─────────────────────────────────────────────────────
+// Returns true if a notification row already exists for the same
+// appointment_id + type + channel combination (prevents double-inserts).
+async function notificationExists(
+  supabase: ReturnType<typeof createClient>,
+  appointment_id: string | undefined,
+  type: string,
+  channel: string,
+): Promise<boolean> {
+  if (!appointment_id) return false;
+  const { data, error } = await supabase
+    .from("notifications")
+    .select("id")
+    .eq("appointment_id", appointment_id)
+    .eq("type", type)
+    .eq("channel", channel)
+    .maybeSingle();
+  if (error) {
+    console.error("Duplicate check error:", error.message);
+    return false; // Err on the side of inserting rather than silently dropping
+  }
+  return data !== null;
+}
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -31,10 +55,10 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    
+
     const authHeader = req.headers.get("Authorization");
-    
-    // Use service role client for database operations
+
+    // Use service role client for all database operations
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const {
@@ -46,55 +70,50 @@ const handler = async (req: Request): Promise<Response> => {
       email_data,
     }: NotificationRequest = await req.json();
 
-    // Check if this is an internal service call using cryptographic secret
-    // Internal calls must pass the secret in X-Internal-Secret header
+    // ─── Auth: internal service call or authenticated user ───────────────────
     const internalSecret = Deno.env.get("INTERNAL_SERVICE_SECRET");
     const providedSecret = req.headers.get("X-Internal-Secret");
     const isServiceCall = internalSecret && providedSecret && providedSecret === internalSecret;
-    
+
     if (!isServiceCall) {
-      // For external calls, require authentication
       if (!authHeader) {
         console.error("Missing authorization header");
         return new Response(
           JSON.stringify({ error: "Missing authorization header" }),
-          { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+          { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } },
         );
       }
 
-      // Create client with user's auth token to validate it
       const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-        global: { headers: { Authorization: authHeader } }
+        global: { headers: { Authorization: authHeader } },
       });
 
-      // Verify the JWT token by getting the user
       const { data: { user }, error: authError } = await userClient.auth.getUser();
-      
+
       if (authError || !user) {
         console.error("Invalid auth token");
         return new Response(
           JSON.stringify({ error: "Invalid or expired authentication token" }),
-          { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+          { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } },
         );
       }
 
       console.log("User authenticated successfully");
 
-      // Security check: Ensure the authenticated user matches the user_id in the request
       if (user.id !== user_id) {
         console.error("User mismatch - access denied");
         return new Response(
           JSON.stringify({ error: "You can only send notifications for your own account" }),
-          { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+          { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } },
         );
       }
     } else {
       console.log("Authenticated internal service call");
     }
 
-    console.log("Processing notification request");
+    console.log("Processing notification request:", { type, appointment_id });
 
-    // Check user notification preferences (only for user notifications, not doctor notifications)
+    // ─── Load user notification preferences ──────────────────────────────────
     let preferences = null;
     if (user_id) {
       const { data } = await supabase
@@ -104,7 +123,6 @@ const handler = async (req: Request): Promise<Response> => {
         .single();
       preferences = data;
 
-      // Create default preferences if none exist
       if (!preferences) {
         await supabase.from("notification_preferences").insert({
           user_id,
@@ -116,66 +134,102 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    const shouldSendEmail = preferences?.email_enabled ?? true;
     const results: any[] = [];
 
-    // Send email notification
-    if (shouldSendEmail && email_data?.recipient_email) {
-      try {
-        // Use custom domain if configured, otherwise use Resend's sandbox
-        // NOTE: onboarding@resend.dev only delivers to the account owner's verified email
-        // For production, add RESEND_FROM_EMAIL secret with your verified domain email
-        const fromEmail = Deno.env.get("RESEND_FROM_EMAIL") || "MediQ <onboarding@resend.dev>";
-        
-        console.log("Sending email notification");
-        
-        const emailResponse = await resend.emails.send({
-          from: fromEmail,
-          to: [email_data.recipient_email],
-          subject: title,
-          html: generateEmailTemplate(type, message, email_data.appointment_details),
-        });
+    // ─── STEP 1: In-App Notification (canonical user-facing record) ───────────
+    // Always create one in_app row with status "sent" to represent the actual
+    // event outcome (appointment confirmed, cancelled, etc.).
+    // This is the only row the Notification History page shows to the user.
+    // It is entirely separate from email/push delivery status.
+    const inAppDuplicate = await notificationExists(supabase, appointment_id, type, "in_app");
+    if (!inAppDuplicate) {
+      const { error: inAppError } = await supabase.from("notifications").insert({
+        user_id,
+        appointment_id: appointment_id ?? null,
+        type,
+        channel: "in_app",
+        status: "sent",
+        title,
+        message,
+        sent_at: new Date().toISOString(),
+      });
+      if (inAppError) {
+        console.error("Failed to insert in_app notification:", inAppError.message);
+      } else {
+        console.log("In-app notification created successfully");
+        results.push({ channel: "in_app", status: "sent" });
+      }
+    } else {
+      console.log("Duplicate in_app notification skipped for appointment_id:", appointment_id);
+      results.push({ channel: "in_app", status: "skipped_duplicate" });
+    }
 
-        console.log("Email sent successfully");
+    // ─── STEP 2: Email Notification (delivery channel record) ────────────────
+    // Email success/failure is tracked separately and does NOT affect the
+    // in_app status shown to users. If email fails, this row stays "failed"
+    // internally but is never surfaced in the user-facing Notification History.
+    const shouldSendEmail = (preferences?.email_enabled ?? true) && !!email_data?.recipient_email;
+    if (shouldSendEmail) {
+      const emailDuplicate = await notificationExists(supabase, appointment_id, type, "email");
+      if (!emailDuplicate) {
+        try {
+          const fromEmail = Deno.env.get("RESEND_FROM_EMAIL") || "MediQ <onboarding@resend.dev>";
 
-        // Check if there's an error in the response
-        if ('error' in emailResponse && emailResponse.error) {
-          throw new Error(JSON.stringify(emailResponse.error));
+          console.log("Sending email notification to:", email_data!.recipient_email);
+
+          const emailResponse = await resend.emails.send({
+            from: fromEmail,
+            to: [email_data!.recipient_email],
+            subject: title,
+            html: generateEmailTemplate(type, message, email_data!.appointment_details),
+          });
+
+          console.log("Email sent successfully");
+
+          if ("error" in emailResponse && emailResponse.error) {
+            throw new Error(JSON.stringify(emailResponse.error));
+          }
+
+          await supabase.from("notifications").insert({
+            user_id,
+            appointment_id: appointment_id ?? null,
+            type,
+            channel: "email",
+            status: "sent",
+            title,
+            message,
+            sent_at: new Date().toISOString(),
+          });
+
+          results.push({ channel: "email", status: "sent" });
+        } catch (error: any) {
+          console.error("Email send failed:", error);
+          const errMsg = error instanceof Error
+            ? error.message
+            : (typeof error === "object" ? JSON.stringify(error) : String(error));
+
+          // Record the email delivery failure as a separate internal record.
+          // Status "failed" here means email delivery failed — NOT appointment failed.
+          await supabase.from("notifications").insert({
+            user_id,
+            appointment_id: appointment_id ?? null,
+            type,
+            channel: "email",
+            status: "failed",
+            title,
+            message,
+            error_message: `Email delivery failed: ${errMsg}`.substring(0, 255),
+          });
+
+          results.push({ channel: "email", status: "failed" });
         }
-
-        // Log notification in database
-        await supabase.from("notifications").insert({
-          user_id,
-          appointment_id,
-          type,
-          channel: "email",
-          status: "sent",
-          title,
-          message,
-          sent_at: new Date().toISOString(),
-        });
-
-        results.push({ channel: "email", status: "sent" });
-      } catch (error: any) {
-        console.error("Email send failed:", error);
-        const errMsg = error instanceof Error ? error.message : (typeof error === 'object' ? JSON.stringify(error) : String(error));
-
-        await supabase.from("notifications").insert({
-          user_id,
-          appointment_id,
-          type,
-          channel: "email",
-          status: "failed",
-          title,
-          message,
-          error_message: `Email delivery failed: ${errMsg}`.substring(0, 255),
-        });
-
-        results.push({ channel: "email", status: "failed" });
+      } else {
+        console.log("Duplicate email notification skipped for appointment_id:", appointment_id);
+        results.push({ channel: "email", status: "skipped_duplicate" });
       }
     }
 
-    // Send push notification
+    // ─── STEP 3: Push Notification (delivery channel record) ─────────────────
     const shouldSendPush = preferences?.push_enabled ?? true;
     if (shouldSendPush) {
       const { data: subscriptions } = await supabase
@@ -184,13 +238,12 @@ const handler = async (req: Request): Promise<Response> => {
         .eq("user_id", user_id);
 
       if (subscriptions && subscriptions.length > 0) {
-        for (const subscription of subscriptions) {
+        const pushDuplicate = await notificationExists(supabase, appointment_id, type, "push");
+        if (!pushDuplicate) {
           try {
-            // Push notification would be handled by the frontend service worker
-            // Just log it for now
             await supabase.from("notifications").insert({
               user_id,
-              appointment_id,
+              appointment_id: appointment_id ?? null,
               type,
               channel: "push",
               status: "sent",
@@ -198,12 +251,14 @@ const handler = async (req: Request): Promise<Response> => {
               message,
               sent_at: new Date().toISOString(),
             });
-
             results.push({ channel: "push", status: "sent" });
           } catch (error: any) {
             console.error("Push notification failed");
             results.push({ channel: "push", status: "failed" });
           }
+        } else {
+          console.log("Duplicate push notification skipped for appointment_id:", appointment_id);
+          results.push({ channel: "push", status: "skipped_duplicate" });
         }
       }
     }
@@ -213,7 +268,7 @@ const handler = async (req: Request): Promise<Response> => {
       {
         status: 200,
         headers: { "Content-Type": "application/json", ...corsHeaders },
-      }
+      },
     );
   } catch (error: any) {
     console.error("Error in send-notification function");
@@ -222,7 +277,7 @@ const handler = async (req: Request): Promise<Response> => {
       {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
-      }
+      },
     );
   }
 };
@@ -230,7 +285,7 @@ const handler = async (req: Request): Promise<Response> => {
 function generateEmailTemplate(
   type: string,
   message: string,
-  appointmentDetails?: any
+  appointmentDetails?: any,
 ): string {
   const baseStyles = `
     <style>
@@ -296,11 +351,11 @@ function generateEmailTemplate(
 // Helper function to escape HTML and prevent XSS
 function escapeHtml(text: string): string {
   const htmlEntities: Record<string, string> = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
   };
   return text.replace(/[&<>"']/g, char => htmlEntities[char] || char);
 }

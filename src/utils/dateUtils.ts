@@ -19,19 +19,28 @@ export const parseLocalDateString = (dateStr: string): Date => {
 };
 
 /**
- * Returns the current date as a local YYYY-MM-DD string.
+ * Returns the current date as a local YYYY-MM-DD string, calculated in the Asia/Kolkata (IST) timezone.
  */
 export const getTodayLocalDateString = (): string => {
-  return toLocalDateString(new Date());
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = formatter.formatToParts(new Date());
+  const year = parts.find((p) => p.type === "year")?.value;
+  const month = parts.find((p) => p.type === "month")?.value;
+  const day = parts.find((p) => p.type === "day")?.value;
+  return `${year}-${month}-${day}`;
 };
 
 /**
- * Returns a local Date object representing the start of today (midnight local time).
+ * Returns a local Date object representing the start of today (midnight local time) in Asia/Kolkata timezone.
  */
 export const getTodayLocalMidnight = (): Date => {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
+  const todayStr = getTodayLocalDateString();
+  return parseLocalDateString(todayStr);
 };
 
 /**

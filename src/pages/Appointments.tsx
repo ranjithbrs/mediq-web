@@ -9,6 +9,7 @@ import { useAppointments } from "@/hooks/useAppointments";
 import { AppointmentCard } from "@/components/appointments/AppointmentCard";
 import { AppointmentEmptyState } from "@/components/appointments/AppointmentEmptyState";
 import { Plus } from "lucide-react";
+import { parseLocalDateString, getTodayLocalMidnight } from "@/utils/dateUtils";
 
 const Appointments = () => {
   const navigate = useNavigate();
@@ -16,12 +17,10 @@ const Appointments = () => {
   const { data: appointments = [], isLoading } = useAppointments(user?.id);
 
   const filteredAppointments = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = getTodayLocalMidnight();
 
     const upcoming = appointments.filter((apt) => {
-      const aptDate = new Date(apt.appointment_date);
-      aptDate.setHours(0, 0, 0, 0);
+      const aptDate = parseLocalDateString(apt.appointment_date);
       return (
         (apt.status === "scheduled" || apt.status === "confirmed") &&
         aptDate >= today
@@ -29,8 +28,7 @@ const Appointments = () => {
     });
 
     const past = appointments.filter((apt) => {
-      const aptDate = new Date(apt.appointment_date);
-      aptDate.setHours(0, 0, 0, 0);
+      const aptDate = parseLocalDateString(apt.appointment_date);
       return (
         apt.status === "completed" ||
         ((apt.status === "scheduled" || apt.status === "confirmed") &&

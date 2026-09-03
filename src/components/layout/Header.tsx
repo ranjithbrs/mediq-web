@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useUnreadNotifications } from "@/hooks/useUnreadNotifications";
 
 export const Header = () => {
   const { user } = useAuth();
+  const { unreadCount } = useUnreadNotifications();
 
   return (
     <header className="sticky top-0 z-50 w-full bg-white border-b border-gray-100 pt-[env(safe-area-inset-top)]">
@@ -24,7 +26,7 @@ export const Header = () => {
                 <Link to="/settings" className="text-lg font-medium text-gray-800 hover:text-primary transition-colors">
                   Settings
                 </Link>
-                <Link to="/support" className="text-lg font-medium text-gray-800 hover:text-primary transition-colors">
+                <Link to="/settings" className="text-lg font-medium text-gray-800 hover:text-primary transition-colors">
                   Help & Support
                 </Link>
               </nav>
@@ -64,14 +66,16 @@ export const Header = () => {
               >
                 <Link to="/notifications">
                   <Bell className="h-5 w-5 text-gray-700" />
-                  <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-green-500 border-2 border-white" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-green-500 border-2 border-white" />
+                  )}
                 </Link>
               </Button>
 
               {/* Avatar */}
               <Link to="/profile" className="ml-1">
                 <Avatar className="h-9 w-9 cursor-pointer border-2 border-primary shadow-sm">
-                  <AvatarImage src="" />
+                  <AvatarImage src={user.user_metadata?.avatar_url || ""} />
                   <AvatarFallback className="bg-primary text-white font-bold text-sm">
                     {user.user_metadata?.full_name?.[0]?.toUpperCase() || "U"}
                   </AvatarFallback>
