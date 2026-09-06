@@ -74,7 +74,6 @@ export const EmergencyMap = ({
   const userMarkerRef = useRef<L.Marker | null>(null);
   const markersRef = useRef<Map<string, L.Marker>>(new Map());
   const routeLayerRef = useRef<L.GeoJSON | null>(null);
-  const isProgrammaticOpenRef = useRef(false);
   const onSelectHospitalRef = useRef(onSelectHospital);
   const selectedHospitalIdRef = useRef<string | null>(selectedHospitalId);
 
@@ -90,9 +89,10 @@ export const EmergencyMap = ({
   // Initialize map once
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
+    const container = containerRef.current;
 
     // Default center = India (only used if location never arrives)
-    const map = L.map(containerRef.current, {
+    const map = L.map(container, {
       center: [20.5937, 78.9629],
       zoom: 4,
       scrollWheelZoom: false,
@@ -105,21 +105,29 @@ export const EmergencyMap = ({
       maxZoom: 19,
     }).addTo(map);
 
-    // Listen to popupclose: clear selected hospital in parent state when user closes popup
-    map.on("popupclose", (e) => {
-      if (isProgrammaticOpenRef.current) return;
+    // Intercept intentional user click on the hospital popup close (X) button
+    const handleContainerClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      const closeBtn = target?.closest(".leaflet-popup-close-button");
+      if (!closeBtn) return;
+
+      const popupEl = closeBtn.closest(".leaflet-popup");
       const currentSelectedId = selectedHospitalIdRef.current;
       if (currentSelectedId) {
-        const marker = markersRef.current.get(currentSelectedId);
-        if (marker && e.popup === marker.getPopup()) {
+        const marker = markersRef.current.get(String(currentSelectedId));
+        const popup = marker?.getPopup();
+        if (popup && (popup.getElement() === popupEl || !popup.getElement())) {
           onSelectHospitalRef.current(null);
         }
       }
-    });
+    };
+
+    container.addEventListener("click", handleContainerClick, true);
 
     mapRef.current = map;
 
     return () => {
+      container.removeEventListener("click", handleContainerClick, true);
       map.remove();
       mapRef.current = null;
       markersRef.current.clear();
@@ -173,12 +181,13 @@ export const EmergencyMap = ({
             <strong>${h.name}</strong><br/>
             ${h.distance > 0 ? `${h.distance.toFixed(1)} km away` : ""}
             ${h.phone ? `<br/><a href="tel:${h.phone}">${h.phone}</a>` : ""}
-          </div>`
+          </div>`,
+          { autoPan: false }
         )
         .on("click", () => {
           onSelectHospitalRef.current(h.id);
         });
-      markersRef.current.set(h.id, marker);
+      markersRef.current.set(String(h.id), marker);
     });
   }, [hospitals]);
 
@@ -195,15 +204,19 @@ export const EmergencyMap = ({
       return;
     }
 
-    const hospital = hospitals.find((h) => h.id === selectedHospitalId);
-    if (!hospital?.latitude || !hospital?.longitude) return;
+    const hospital = hospitals.find((h) => String(h.id) === String(selectedHospitalId));
+    if (!hospital || hospital.latitude == null || hospital.longitude == null) return;
 
-    isProgrammaticOpenRef.current = true;
+    const hospLat = Number(hospital.latitude);
+    const hospLng = Number(hospital.longitude);
+    if (isNaN(hospLat) || isNaN(hospLng)) return;
+
+    map.invalidateSize();
 
     if (userLocation) {
       const bounds = L.latLngBounds(
         [userLocation.lat, userLocation.lng],
-        [hospital.latitude, hospital.longitude]
+        [hospLat, hospLng]
       );
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
 
@@ -212,11 +225,14 @@ export const EmergencyMap = ({
         routeLayerRef.current = null;
       }
 
-      const url = `https://router.project-osrm.org/route/v1/driving/${userLocation.lng},${userLocation.lat};${hospital.longitude},${hospital.latitude}?overview=full&geometries=geojson`;
+      const url = `https://router.project-osrm.org/route/v1/driving/${userLocation.lng},${userLocation.lat};${hospLng},${hospLat}?overview=full&geometries=geojson`;
       fetch(url)
         .then((r) => r.json())
         .then((data) => {
           if (data.routes?.[0]) {
+            if (routeLayerRef.current) {
+              map.removeLayer(routeLayerRef.current);
+            }
             routeLayerRef.current = L.geoJSON(data.routes[0].geometry, {
               style: { color: "#3b82f6", weight: 5, opacity: 0.8 },
             }).addTo(map);
@@ -224,17 +240,13 @@ export const EmergencyMap = ({
         })
         .catch(console.error);
     } else {
-      map.setView([hospital.latitude, hospital.longitude], 14);
+      map.setView([hospLat, hospLng], 14);
     }
 
-    const targetMarker = markersRef.current.get(selectedHospitalId);
+    const targetMarker = markersRef.current.get(String(selectedHospitalId));
     if (targetMarker) {
       targetMarker.openPopup();
     }
-
-    setTimeout(() => {
-      isProgrammaticOpenRef.current = false;
-    }, 100);
   }, [selectedHospitalId, selectCount, hospitals, userLocation]);
 
   return (

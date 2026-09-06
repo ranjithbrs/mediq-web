@@ -75,17 +75,29 @@ const Emergency = () => {
   const [selectedHospital, setSelectedHospital] = useState<string | null>(null);
   const [selectCount, setSelectCount] = useState(0);
 
-  const initialAutoSelectDoneRef = useRef(false);
+  const mapSectionRef = useRef<HTMLDivElement>(null);
 
   const handleSelectHospital = useCallback((id: string | null) => {
     setSelectedHospital(id);
     setSelectCount((prev) => prev + 1);
   }, []);
 
+  const handleHospitalCardClick = (id: string) => {
+    handleSelectHospital(id);
+    const el = mapSectionRef.current || document.getElementById("emergency-map-section");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
   // Alert
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [alertSent, setAlertSent] = useState(false);
+  const [notificationStatus, setNotificationStatus] = useState<"success" | "failed" | null>(null);
+  const [notificationError, setNotificationError] = useState<string | null>(null);
+
+  const isOsmHospital = Boolean(selectedHospital && selectedHospital.startsWith("osm-"));
 
   // Manual search
   const [manualQuery, setManualQuery] = useState("");
@@ -183,7 +195,6 @@ const Emergency = () => {
         const { lat, lon } = results[0];
         const label = results[0].display_name.split(",")[0];
 
-        initialAutoSelectDoneRef.current = false;
         manualSearchActiveRef.current = true;
         setLocation({ lat: parseFloat(lat), lng: parseFloat(lon) });
         setLocationLabel(label);
@@ -210,7 +221,6 @@ const Emergency = () => {
   };
 
   const resetToGPS = () => {
-    initialAutoSelectDoneRef.current = false;
     manualSearchActiveRef.current = false;
     setLocation(null);
     setLocationLabel(null);
@@ -312,35 +322,96 @@ const Emergency = () => {
     setHospitals(allHospitals);
   }, [dbHospitals, osmHospitals, location?.lat, location?.lng]);
 
-  // Auto-select nearest on initial data load
-  useEffect(() => {
-    if (hospitals.length > 0 && !initialAutoSelectDoneRef.current) {
-      initialAutoSelectDoneRef.current = true;
-      setSelectedHospital(hospitals[0].id);
-    }
-  }, [hospitals]);
 
   // ── Send alert ─────────────────────────────────────────────────────────────
 
   const sendAlert = async () => {
     if (!user) { navigate("/auth"); return; }
     if (!selectedHospital || !location) return;
-    setSending(true);
-    const { error } = await supabase.from("emergency_alerts").insert({
-      user_id: user.id,
-      hospital_id: selectedHospital,
-      latitude: location.lat,
-      longitude: location.lng,
-      message: message || "Emergency assistance needed",
-      status: "pending",
-    });
-    if (error) {
-      toast({ title: "Error", description: "Failed to send emergency alert.", variant: "destructive" });
-    } else {
-      setAlertSent(true);
-      toast({ title: "Alert Sent!", description: "The hospital has been notified of your emergency." });
+
+    if (isOsmHospital) {
+      toast({
+        title: "Cannot Send Alert",
+        description: "Emergency alerts can only be sent to registered MediQ partner hospitals. Please call this medical center directly.",
+        variant: "destructive",
+      });
+      return;
     }
-    setSending(false);
+
+    setSending(true);
+    setNotificationStatus(null);
+    setNotificationError(null);
+
+    // 1. Insert alert record into database
+    const { data: newAlert, error: insertError } = await supabase
+      .from("emergency_alerts")
+      .insert({
+        user_id: user.id,
+        hospital_id: selectedHospital,
+        latitude: location.lat,
+        longitude: location.lng,
+        message: message || "Emergency assistance needed",
+        status: "pending",
+        email_status: "pending",
+      })
+      .select("id")
+      .single();
+
+    if (insertError || !newAlert) {
+      console.error("[Emergency] Insert alert error:", insertError);
+      toast({
+        title: "Error",
+        description: "Failed to send emergency alert.",
+        variant: "destructive",
+      });
+      setSending(false);
+      return;
+    }
+
+    // 2. Invoke Edge Function to securely dispatch email notification to the hospital
+    try {
+      const { data: fnData, error: fnError } = await supabase.functions.invoke(
+        "send-emergency-alert",
+        {
+          body: { emergency_alert_id: newAlert.id },
+        }
+      );
+
+      if (fnError || (fnData && !fnData.success)) {
+        const errorMsg =
+          fnData?.error || fnError?.message || "Hospital email delivery failed";
+        console.warn("[Emergency] Notification dispatch warning:", errorMsg);
+        setNotificationStatus("failed");
+        setNotificationError(errorMsg);
+        setAlertSent(true);
+        toast({
+          title: "Alert Saved (Notification Warning)",
+          description: `Emergency alert saved, but hospital email notification could not be delivered: ${errorMsg}. Please call the hospital immediately.`,
+          variant: "destructive",
+        });
+      } else {
+        setNotificationStatus("success");
+        setNotificationError(null);
+        setAlertSent(true);
+        toast({
+          title: "Alert Sent!",
+          description: "The hospital has been notified of your emergency via email.",
+        });
+      }
+    } catch (err: any) {
+      console.error("[Emergency] Edge Function invoke error:", err);
+      const errorMsg = err?.message || "Could not dispatch email notification";
+      setNotificationStatus("failed");
+      setNotificationError(errorMsg);
+      setAlertSent(true);
+      toast({
+        title: "Alert Saved (Notification Warning)",
+        description: `Emergency alert saved, but hospital email notification failed: ${errorMsg}. Please call the hospital immediately.`,
+        variant: "destructive",
+      });
+    } finally {
+      setSending(false);
+    }
   };
 
   // ── Alert sent screen ──────────────────────────────────────────────────────
@@ -353,19 +424,39 @@ const Emergency = () => {
           <div className="mx-auto w-20 h-20 rounded-full bg-accent/10 flex items-center justify-center">
             <CheckCircle2 className="h-10 w-10 text-accent" />
           </div>
-          <h1 className="text-2xl font-bold">Emergency Alert Sent</h1>
-          <p className="text-muted-foreground">
-            <strong>{hospital?.name}</strong> has been notified. They are preparing for your arrival.
-          </p>
+          <h1 className="text-2xl font-bold">Emergency Alert Saved</h1>
+
+          {notificationStatus === "success" ? (
+            <p className="text-muted-foreground">
+              <strong>{hospital?.name}</strong> has been notified via emergency email. They are preparing for your arrival.
+            </p>
+          ) : (
+            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4 text-sm text-amber-900 dark:text-amber-200 text-left space-y-2">
+              <p className="font-semibold">⚠️ Hospital Email Notification Warning</p>
+              <p className="text-xs text-amber-800 dark:text-amber-300">
+                Your emergency alert record was created in the system, but the hospital email notification could not be confirmed ({notificationError || "provider unavailable"}).
+              </p>
+              <p className="text-xs font-semibold">
+                Please call the hospital directly using the button below to confirm immediate readiness.
+              </p>
+            </div>
+          )}
+
           {hospital?.phone && (
-            <Button asChild variant="outline" className="gap-2">
+            <Button asChild variant="outline" className="gap-2 w-full sm:w-auto">
               <a href={`tel:${hospital.phone}`}>
                 <Phone className="h-4 w-4" /> Call Hospital: {hospital.phone}
               </a>
             </Button>
           )}
           <Button
-            onClick={() => { setAlertSent(false); setSelectedHospital(null); setMessage(""); }}
+            onClick={() => {
+              setAlertSent(false);
+              setSelectedHospital(null);
+              setMessage("");
+              setNotificationStatus(null);
+              setNotificationError(null);
+            }}
           >
             Send Another Alert
           </Button>
@@ -378,7 +469,7 @@ const Emergency = () => {
 
   return (
     <MainLayout>
-      <div className="max-w-2xl mx-auto w-full px-4 pt-6 pb-36 space-y-4">
+      <div className="max-w-2xl mx-auto w-full px-4 pt-6 pb-44 space-y-4">
 
         {/* Header */}
         <div className="flex items-center gap-3">
@@ -472,13 +563,15 @@ const Emergency = () => {
         )}
 
         {/* Map */}
-        <EmergencyMap
-          userLocation={location}
-          hospitals={hospitals}
-          selectedHospitalId={selectedHospital}
-          onSelectHospital={handleSelectHospital}
-          selectCount={selectCount}
-        />
+        <div ref={mapSectionRef} id="emergency-map-section" className="scroll-mt-4">
+          <EmergencyMap
+            userLocation={location}
+            hospitals={hospitals}
+            selectedHospitalId={selectedHospital}
+            onSelectHospital={handleSelectHospital}
+            selectCount={selectCount}
+          />
+        </div>
 
         {/* Emergency Details */}
         <div>
@@ -516,12 +609,23 @@ const Emergency = () => {
                       ? "ring-2 ring-destructive border-destructive"
                       : "hover:shadow-md"
                   }`}
-                  onClick={() => handleSelectHospital(hospital.id)}
+                  onClick={() => handleHospitalCardClick(hospital.id)}
                 >
                   <CardContent className="pt-4 pb-4">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <h3 className="font-semibold">{hospital.name}</h3>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-semibold">{hospital.name}</h3>
+                          {hospital.id.startsWith("osm-") ? (
+                            <Badge variant="outline" className="text-[10px] text-muted-foreground py-0 h-4">
+                              Map Facility
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] text-green-700 dark:text-green-400 border-green-300 dark:border-green-800 bg-green-50 dark:bg-green-950/30 py-0 h-4">
+                              MediQ Partner
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
                           <MapPin className="h-3 w-3" />
                           {hospital.address}{hospital.city ? `, ${hospital.city}` : ""}
@@ -549,17 +653,32 @@ const Emergency = () => {
           )}
         </div>
 
-        {/* Send Alert Button */}
-        <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom)+1rem)] z-10">
-          <Button
-            size="lg"
-            className="w-full bg-destructive hover:bg-destructive/90 text-destructive-foreground gap-2 h-14 text-lg font-bold shadow-lg"
-            disabled={!selectedHospital || !location || sending}
-            onClick={sendAlert}
-          >
-            {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Siren className="h-5 w-5" />}
-            {sending ? "Sending Alert..." : "Send Emergency Alert"}
-          </Button>
+        {/* Fixed Send Alert Button CTA */}
+        <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] md:bottom-0 left-0 right-0 z-40 p-4 md:pb-[calc(1rem+env(safe-area-inset-bottom))] bg-background/80 backdrop-blur-md border-t border-border/40">
+          <div className="max-w-2xl mx-auto w-full">
+            {isOsmHospital && (
+              <p className="text-xs text-center text-amber-600 dark:text-amber-400 mb-2 font-medium">
+                Emergency alerts can only be sent to registered MediQ partner hospitals. Please call this facility directly.
+              </p>
+            )}
+            <Button
+              size="lg"
+              className="w-full bg-destructive hover:bg-destructive/90 text-destructive-foreground gap-2 h-14 text-lg font-bold shadow-lg disabled:opacity-50"
+              disabled={!selectedHospital || isOsmHospital || !location || sending}
+              onClick={sendAlert}
+            >
+              {sending ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Siren className="h-5 w-5" />
+              )}
+              {sending
+                ? "Sending Alert..."
+                : isOsmHospital
+                ? "Alert Unavailable for External Facility"
+                : "Send Emergency Alert"}
+            </Button>
+          </div>
         </div>
       </div>
     </MainLayout>

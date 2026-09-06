@@ -89,6 +89,7 @@ const AppointmentDetail = lazy(() => import("./pages/AppointmentDetail"));
 const Pharmacy = lazy(() => import("./pages/Pharmacy"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const DoctorDashboard = lazy(() => import("./pages/DoctorDashboard"));
+const HospitalDashboard = lazy(() => import("./pages/HospitalDashboard"));
 const Emergency = lazy(() => import("./pages/Emergency"));
 
 const queryClient = new QueryClient({
@@ -141,6 +142,7 @@ const App = () => (
                 {/* Role-Based Routes */}
                 <Route path="/admin" element={<RoleBasedRoute allowedRoles={["admin"]}><AdminDashboard /></RoleBasedRoute>} />
                 <Route path="/doctor-dashboard" element={<RoleBasedRoute allowedRoles={["doctor"]}><DoctorDashboard /></RoleBasedRoute>} />
+                <Route path="/hospital-dashboard" element={<RoleBasedRoute allowedRoles={["hospital"]}><HospitalDashboard /></RoleBasedRoute>} />
                 
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />

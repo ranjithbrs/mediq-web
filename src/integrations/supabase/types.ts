@@ -237,6 +237,9 @@ export type Database = {
       emergency_alerts: {
         Row: {
           created_at: string
+          email_error: string | null
+          email_sent_at: string | null
+          email_status: string
           hospital_id: string
           id: string
           latitude: number
@@ -248,6 +251,9 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          email_error?: string | null
+          email_sent_at?: string | null
+          email_status?: string
           hospital_id: string
           id?: string
           latitude: number
@@ -259,6 +265,9 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          email_error?: string | null
+          email_sent_at?: string | null
+          email_status?: string
           hospital_id?: string
           id?: string
           latitude?: number
@@ -350,6 +359,51 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      hospital_staff: {
+        Row: {
+          created_at: string
+          hospital_id: string
+          id: string
+          is_active: boolean
+          staff_role: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          hospital_id: string
+          id?: string
+          is_active?: boolean
+          staff_role?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          hospital_id?: string
+          id?: string
+          is_active?: boolean
+          staff_role?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hospital_staff_hospital_id_fkey"
+            columns: ["hospital_id"]
+            isOneToOne: false
+            referencedRelation: "hospitals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hospital_staff_hospital_id_fkey"
+            columns: ["hospital_id"]
+            isOneToOne: false
+            referencedRelation: "public_hospitals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notification_preferences: {
         Row: {
@@ -1009,6 +1063,10 @@ export type Database = {
         Args: { p_doctor: string; p_user: string }
         Returns: boolean
       }
+      get_user_hospital_id: {
+        Args: { _user_id: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1072,7 +1130,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "doctor" | "patient"
+      app_role: "admin" | "doctor" | "patient" | "hospital"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1200,7 +1258,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "doctor", "patient"],
+      app_role: ["admin", "doctor", "patient", "hospital"],
     },
   },
 } as const

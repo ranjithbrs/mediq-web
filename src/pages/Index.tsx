@@ -73,17 +73,21 @@ const PatientFollowUp = ({ userId }: { userId: string }) => {
 
 const Index = () => {
   useProfileCompletion();
-  const { isAdmin, isDoctor, user, loading } = useUserRole();
+  const { isAdmin, isDoctor, isHospital, user, loading } = useUserRole();
   const navigate = useNavigate();
   const { user: authUser } = useAuth();
   // Always call hooks unconditionally (Rules of Hooks)
   const profileName = useProfileName(authUser?.id);
 
   useEffect(() => {
-    if (!loading && isDoctor) {
-      navigate("/doctor-dashboard", { replace: true });
+    if (!loading) {
+      if (isHospital) {
+        navigate("/hospital-dashboard", { replace: true });
+      } else if (isDoctor) {
+        navigate("/doctor-dashboard", { replace: true });
+      }
     }
-  }, [isDoctor, loading, navigate]);
+  }, [isDoctor, isHospital, loading, navigate]);
 
   if (loading) {
     return (

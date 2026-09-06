@@ -43,7 +43,7 @@ const Auth = () => {
   
   const isRecovery = searchParams.get("recovery") === "true";
 
-  const { isDoctor, loading: roleLoading } = useUserRole();
+  const { isDoctor, isHospital, loading: roleLoading } = useUserRole();
 
   // All useState calls must be declared before any conditional returns (Rules of Hooks)
   const [isLoading, setIsLoading] = useState(false);
@@ -78,13 +78,15 @@ const Auth = () => {
 
   useEffect(() => {
     if (!loading && !roleLoading && user && !isRecovery) {
-      if (isDoctor) {
+      if (isHospital) {
+        navigate("/hospital-dashboard", { replace: true });
+      } else if (isDoctor) {
         navigate("/doctor-dashboard", { replace: true });
       } else {
         navigate("/", { replace: true });
       }
     }
-  }, [user, loading, roleLoading, isDoctor, isRecovery, navigate]);
+  }, [user, loading, roleLoading, isDoctor, isHospital, isRecovery, navigate]);
 
   if (loading || (user && !isRecovery && roleLoading)) {
     return (
@@ -152,6 +154,7 @@ const Auth = () => {
         .eq("user_id", data.user.id);
 
       const roles = roleData?.map((r: any) => r.role) || [];
+      const isHospitalUser = roles.includes("hospital");
       const isDoc = roles.includes("doctor");
 
       toast({
@@ -159,7 +162,9 @@ const Auth = () => {
         description: "Logged in successfully!",
       });
 
-      if (isDoc) {
+      if (isHospitalUser) {
+        navigate("/hospital-dashboard", { replace: true });
+      } else if (isDoc) {
         navigate("/doctor-dashboard", { replace: true });
       } else {
         navigate("/", { replace: true });

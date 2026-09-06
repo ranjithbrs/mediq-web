@@ -5,3 +5,7 @@ verify_jwt = false
 
 [functions.create-razorpay-order]
 verify_jwt = false
+
+[functions.send-emergency-alert]
+verify_jwt = false
+

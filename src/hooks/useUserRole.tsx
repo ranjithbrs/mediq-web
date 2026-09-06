@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 
-export type AppRole = "admin" | "doctor" | "patient";
+export type AppRole = "admin" | "doctor" | "patient" | "hospital";
 
 export const useUserRole = () => {
   const { user, loading: authLoading } = useAuth();
@@ -42,6 +42,8 @@ export const useUserRole = () => {
   const isAdmin = hasRole("admin");
   const isDoctor = hasRole("doctor");
   const isPatient = hasRole("patient");
+  const isHospital = hasRole("hospital");
 
-  return { roles, loading: loading || authLoading || isTransitioning, hasRole, isAdmin, isDoctor, isPatient, user };
+  return { roles, loading: loading || authLoading || isTransitioning, hasRole, isAdmin, isDoctor, isPatient, isHospital, user };
 };
+

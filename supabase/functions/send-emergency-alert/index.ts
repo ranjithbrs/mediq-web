@@ -1,0 +1,395 @@
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+import { Resend } from "https://esm.sh/resend@4.0.0";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-internal-secret",
+};
+
+interface EmergencyAlertRequest {
+  emergency_alert_id: string;
+}
+
+function generateEmergencyEmailHtml(params: {
+  hospitalName: string;
+  patientName: string;
+  patientPhone: string;
+  patientEmail: string;
+  message: string;
+  latitude: number;
+  longitude: number;
+  alertTime: string;
+}): string {
+  const mapsUrl = `https://www.google.com/maps?q=${params.latitude},${params.longitude}`;
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>🚨 EMERGENCY MEDICAL ALERT</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: #f8fafc; color: #1e293b; }
+    .wrapper { max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 8px; overflow: hidden; border: 2px solid #ef4444; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15); }
+    .header { background: #dc2626; color: #ffffff; padding: 24px; text-align: center; }
+    .header h1 { margin: 0 0 8px 0; font-size: 24px; font-weight: 800; letter-spacing: 0.5px; }
+    .header p { margin: 0; font-size: 15px; font-weight: 600; opacity: 0.95; }
+    .content { padding: 24px; }
+    .alert-banner { background: #fef2f2; border-left: 4px solid #ef4444; padding: 14px 16px; margin-bottom: 20px; border-radius: 0 4px 4px 0; }
+    .alert-banner p { margin: 0; font-size: 14px; color: #991b1b; font-weight: 600; }
+    .section-title { font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; font-weight: 700; margin: 20px 0 10px 0; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+    .info-grid { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+    .info-grid td { padding: 8px 0; font-size: 14px; vertical-align: top; }
+    .info-grid .label { width: 140px; color: #64748b; font-weight: 600; }
+    .info-grid .value { color: #0f172a; font-weight: 500; }
+    .info-grid .value strong { color: #dc2626; }
+    .situation-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 14px; font-size: 14px; color: #1e293b; line-height: 1.5; margin-bottom: 20px; }
+    .cta-button { display: inline-block; background: #dc2626; color: #ffffff !important; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 14px; margin: 12px 0 20px 0; text-align: center; }
+    .footer { background: #f1f5f9; padding: 16px 24px; font-size: 12px; color: #64748b; text-align: center; border-top: 1px solid #e2e8f0; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <h1>🚨 EMERGENCY ALERT</h1>
+      <p>IMMEDIATE MEDICAL ATTENTION REQUIRED</p>
+    </div>
+
+    <div class="content">
+      <div class="alert-banner">
+        <p>A patient has requested immediate emergency response assistance from <strong>${params.hospitalName}</strong> via MediQ Emergency Assist.</p>
+      </div>
+
+      <div class="section-title">Patient Information</div>
+      <table class="info-grid">
+        <tr>
+          <td class="label">Patient Name:</td>
+          <td class="value"><strong>${params.patientName}</strong></td>
+        </tr>
+        <tr>
+          <td class="label">Contact Phone:</td>
+          <td class="value">
+            ${params.patientPhone !== "Phone not provided" ? `<a href="tel:${params.patientPhone}" style="color:#dc2626;font-weight:700;text-decoration:none;">📞 ${params.patientPhone}</a>` : "Not provided"}
+          </td>
+        </tr>
+        <tr>
+          <td class="label">Email:</td>
+          <td class="value">${params.patientEmail}</td>
+        </tr>
+        <tr>
+          <td class="label">Alert Dispatched:</td>
+          <td class="value">${params.alertTime}</td>
+        </tr>
+      </table>
+
+      <div class="section-title">Emergency Situation / Notes</div>
+      <div class="situation-box">
+        ${params.message ? params.message.replace(/\n/g, "<br/>") : "Emergency assistance requested. No additional details provided by patient."}
+      </div>
+
+      <div class="section-title">Patient GPS Coordinates</div>
+      <table class="info-grid">
+        <tr>
+          <td class="label">Coordinates:</td>
+          <td class="value"><code>${params.latitude.toFixed(6)}, ${params.longitude.toFixed(6)}</code></td>
+        </tr>
+      </table>
+
+      <div style="text-align: center;">
+        <a href="${mapsUrl}" class="cta-button" target="_blank" rel="noopener noreferrer">
+          📍 Open Location in Google Maps
+        </a>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p style="margin: 0 0 4px 0;">This automated high-priority alert was generated by the <strong>MediQ Emergency Dispatch System</strong>.</p>
+      <p style="margin: 0;">Recipient: ${params.hospitalName} Emergency Department</p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim();
+}
+
+serve(async (req: Request): Promise<Response> => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const resendApiKey = Deno.env.get("RESEND_API_KEY");
+
+    if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
+      console.error("[send-emergency-alert] Missing Supabase environment variables");
+      return new Response(
+        JSON.stringify({ success: false, error: "Server configuration error" }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // 1. Verify caller authentication (internal service call via service role key or authenticated patient JWT)
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Missing Authorization header" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+    const isServiceCall = Boolean(supabaseServiceKey && token === supabaseServiceKey);
+
+    let callerUserId: string | null = null;
+    let callerUserEmail: string | null = null;
+    let callerUserMetadata: any = null;
+
+    if (!isServiceCall) {
+      const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+
+      const {
+        data: { user },
+        error: authError,
+      } = await userClient.auth.getUser();
+
+      if (authError || !user) {
+        console.error("[send-emergency-alert] Invalid session token:", authError);
+        return new Response(
+          JSON.stringify({ success: false, error: "Invalid or expired authentication session" }),
+          { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+
+      callerUserId = user.id;
+      callerUserEmail = user.email || null;
+      callerUserMetadata = user.user_metadata || null;
+    }
+
+    const { emergency_alert_id }: EmergencyAlertRequest = await req.json();
+
+    if (!emergency_alert_id) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Missing emergency_alert_id parameter" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // 2. Service-role client for secure database operations
+    const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
+
+    // 3. Fetch emergency alert record
+    const { data: alert, error: alertError } = await serviceClient
+      .from("emergency_alerts")
+      .select("*")
+      .eq("id", emergency_alert_id)
+      .maybeSingle();
+
+    if (alertError || !alert) {
+      console.error("[send-emergency-alert] Alert not found:", alertError);
+      return new Response(
+        JSON.stringify({ success: false, error: "Emergency alert record not found" }),
+        { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // 4. Verify patient authorization (must match alert creator, unless service call)
+    if (!isServiceCall && callerUserId && alert.user_id !== callerUserId) {
+      console.error("[send-emergency-alert] User mismatch:", { caller: callerUserId, alertUser: alert.user_id });
+      return new Response(
+        JSON.stringify({ success: false, error: "Unauthorized. You can only dispatch alerts for your own account." }),
+        { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // 5. Idempotency Check (Prevent duplicate emails if invoked twice)
+    if (alert.email_status === "sent" || alert.email_sent_at) {
+      console.log(`[send-emergency-alert] Alert ${emergency_alert_id} email already sent. Skipping duplicate.`);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "Emergency email has already been dispatched for this alert.",
+          already_sent: true,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // 6. Fetch hospital details securely (includes email from public.hospitals)
+    const { data: hospital, error: hospitalError } = await serviceClient
+      .from("hospitals")
+      .select("id, name, email, phone, address, city, state")
+      .eq("id", alert.hospital_id)
+      .maybeSingle();
+
+    if (hospitalError || !hospital) {
+      console.error("[send-emergency-alert] Hospital not found:", hospitalError);
+      await serviceClient
+        .from("emergency_alerts")
+        .update({
+          email_status: "failed",
+          email_error: "Registered hospital record not found in system",
+        })
+        .eq("id", emergency_alert_id);
+
+      return new Response(
+        JSON.stringify({ success: false, error: "Registered hospital not found" }),
+        { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // 7. Verify hospital email
+    const hospitalEmail = hospital.email?.trim();
+    if (!hospitalEmail || !hospitalEmail.includes("@")) {
+      console.warn(`[send-emergency-alert] Hospital "${hospital.name}" (${hospital.id}) has no registered email address`);
+      await serviceClient
+        .from("emergency_alerts")
+        .update({
+          email_status: "no_email",
+          email_error: `Hospital "${hospital.name}" does not have a registered contact email address`,
+        })
+        .eq("id", emergency_alert_id);
+
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `Hospital "${hospital.name}" has no registered email address. Please call directly.`,
+          hospital_phone: hospital.phone || null,
+        }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // 8. Fetch patient details safely without assuming profiles.email exists
+    const { data: profile } = await serviceClient
+      .from("profiles")
+      .select("full_name, phone, emergency_phone")
+      .eq("id", alert.user_id)
+      .maybeSingle();
+
+    let patientEmail = callerUserEmail;
+    if (!patientEmail) {
+      const { data: authUser } = await serviceClient.auth.admin.getUserById(alert.user_id);
+      patientEmail = authUser?.user?.email || "Email not provided";
+    }
+
+    const patientName =
+      profile?.full_name ||
+      callerUserMetadata?.full_name ||
+      callerUserMetadata?.name ||
+      "Patient (Name not specified)";
+
+    const patientPhone =
+      profile?.phone ||
+      profile?.emergency_phone ||
+      callerUserMetadata?.phone ||
+      "Phone not provided";
+
+    const alertTime = alert.created_at
+      ? new Date(alert.created_at).toUTCString()
+      : new Date().toUTCString();
+
+    // 9. Dispatch Emergency Email via Resend
+    if (!resendApiKey) {
+      console.error("[send-emergency-alert] RESEND_API_KEY is not configured");
+      await serviceClient
+        .from("emergency_alerts")
+        .update({
+          email_status: "failed",
+          email_error: "Resend email provider API key is not configured in environment",
+        })
+        .eq("id", emergency_alert_id);
+
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Email notification service is not configured. Please contact the hospital by phone.",
+        }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const resend = new Resend(resendApiKey);
+    const fromEmail =
+      Deno.env.get("RESEND_FROM_EMAIL") || "MediQ Emergency <onboarding@resend.dev>";
+
+    console.log(`[send-emergency-alert] Sending emergency alert email to: ${hospitalEmail} for hospital: ${hospital.name}`);
+
+    const emailHtml = generateEmergencyEmailHtml({
+      hospitalName: hospital.name,
+      patientName,
+      patientPhone,
+      patientEmail,
+      message: alert.message || "Emergency assistance needed",
+      latitude: Number(alert.latitude),
+      longitude: Number(alert.longitude),
+      alertTime,
+    });
+
+    const emailResponse = await resend.emails.send({
+      from: fromEmail,
+      to: [hospitalEmail],
+      subject: `🚨 [EMERGENCY ALERT] Immediate Medical Attention Required - ${hospital.name}`,
+      html: emailHtml,
+    });
+
+    if ("error" in emailResponse && emailResponse.error) {
+      const errMsg =
+        typeof emailResponse.error === "object"
+          ? JSON.stringify(emailResponse.error)
+          : String(emailResponse.error);
+      console.error("[send-emergency-alert] Resend send error:", errMsg);
+
+      await serviceClient
+        .from("emergency_alerts")
+        .update({
+          email_status: "failed",
+          email_error: errMsg.substring(0, 255),
+        })
+        .eq("id", emergency_alert_id);
+
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `Email delivery to hospital failed: ${errMsg}`,
+        }),
+        { status: 502, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // 10. Update alert with successful email dispatch record
+    await serviceClient
+      .from("emergency_alerts")
+      .update({
+        email_status: "sent",
+        email_sent_at: new Date().toISOString(),
+        email_error: null,
+      })
+      .eq("id", emergency_alert_id);
+
+    console.log(`[send-emergency-alert] Emergency email successfully dispatched to ${hospitalEmail}`);
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: "Emergency email successfully dispatched to hospital",
+        hospital_name: hospital.name,
+        email_id: emailResponse.data?.id || null,
+      }),
+      { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+    );
+  } catch (error: any) {
+    console.error("[send-emergency-alert] Unhandled error:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    return new Response(
+      JSON.stringify({ success: false, error: `Internal error: ${message}` }),
+      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+    );
+  }
+});
