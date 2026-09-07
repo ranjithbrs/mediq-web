@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -23,6 +24,56 @@ export interface EmergencyAlertItem {
 
 export const useHospitalEmergencyAlerts = (hospitalId?: string) => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Real-time subscription for emergency alert events (INSERT & UPDATE) scoped to this hospital
+  useEffect(() => {
+    if (!user || !hospitalId) return;
+
+    const channelName = `hospital-alerts-${hospitalId}`;
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "emergency_alerts",
+          filter: `hospital_id=eq.${hospitalId}`,
+        },
+        () => {
+          queryClient.invalidateQueries({
+            queryKey: ["hospital-emergency-alerts", hospitalId],
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "emergency_alerts",
+          filter: `hospital_id=eq.${hospitalId}`,
+        },
+        () => {
+          queryClient.invalidateQueries({
+            queryKey: ["hospital-emergency-alerts", hospitalId],
+          });
+        }
+      )
+      .subscribe((status, err) => {
+        if (err || status === "CHANNEL_ERROR") {
+          console.warn(
+            `[useHospitalEmergencyAlerts] Realtime subscription issue for ${channelName} (${status}):`,
+            err
+          );
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [hospitalId, user?.id, queryClient]);
 
   return useQuery<EmergencyAlertItem[]>({
     queryKey: ["hospital-emergency-alerts", hospitalId, user?.id],

@@ -132,6 +132,7 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   in_consultation: { label: "In Progress", className: "bg-amber-100 text-amber-800 border-amber-200" },
   completed:       { label: "Completed",   className: "bg-emerald-100 text-emerald-800 border-emerald-200" },
   cancelled:       { label: "Cancelled",   className: "bg-red-100 text-red-800 border-red-200" },
+  missed:          { label: "Missed",      className: "bg-amber-100 text-amber-800 border-amber-200" },
 };
 
 const PAYMENT_CONFIG: Record<string, { label: string; className: string }> = {

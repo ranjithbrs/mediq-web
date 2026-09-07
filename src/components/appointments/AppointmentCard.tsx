@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { parseLocalDateString } from "@/utils/dateUtils";
+import { getEffectiveAppointmentStatus } from "@/utils/appointmentUtils";
 
 interface AppointmentCardProps {
   appointment: {
@@ -33,6 +34,8 @@ const getStatusColor = (status: string) => {
       return "bg-green-500";
     case "cancelled":
       return "bg-red-500";
+    case "missed":
+      return "bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800";
     default:
       return "bg-gray-500";
   }
@@ -48,6 +51,8 @@ const getStatusLabel = (status: string) => {
       return "Completed";
     case "cancelled":
       return "Cancelled";
+    case "missed":
+      return "Missed";
     default:
       return status;
   }
@@ -55,6 +60,7 @@ const getStatusLabel = (status: string) => {
 
 export const AppointmentCard = ({ appointment }: AppointmentCardProps) => {
   const navigate = useNavigate();
+  const effectiveStatus = getEffectiveAppointmentStatus(appointment);
 
   return (
     <Card
@@ -84,8 +90,8 @@ export const AppointmentCard = ({ appointment }: AppointmentCardProps) => {
             </div>
           </div>
           <div className="flex items-start gap-2">
-            <Badge className={getStatusColor(appointment.status)}>
-              {getStatusLabel(appointment.status)}
+            <Badge className={getStatusColor(effectiveStatus)}>
+              {getStatusLabel(effectiveStatus)}
             </Badge>
             <ChevronRight className="h-5 w-5 text-muted-foreground" />
           </div>

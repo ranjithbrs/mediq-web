@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { parseLocalDateString } from "@/utils/dateUtils";
+import { getEffectiveAppointmentStatus } from "@/utils/appointmentUtils";
 
 const AppointmentDetail = () => {
   const { id } = useParams();
@@ -121,6 +122,8 @@ const AppointmentDetail = () => {
     }
   };
 
+  const effectiveStatus = getEffectiveAppointmentStatus(appointment);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "scheduled":
@@ -130,8 +133,27 @@ const AppointmentDetail = () => {
         return "bg-green-500";
       case "cancelled":
         return "bg-red-500";
+      case "missed":
+        return "bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800";
       default:
         return "bg-gray-500";
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "scheduled":
+        return "Scheduled";
+      case "confirmed":
+        return "Confirmed";
+      case "completed":
+        return "Completed";
+      case "cancelled":
+        return "Cancelled";
+      case "missed":
+        return "Missed";
+      default:
+        return status;
     }
   };
 
@@ -170,8 +192,8 @@ const AppointmentDetail = () => {
       <div className="container py-6 max-w-4xl">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold">Appointment Details</h1>
-          <Badge className={getStatusColor(appointment.status)}>
-            {appointment.status}
+          <Badge className={getStatusColor(effectiveStatus)}>
+            {getStatusLabel(effectiveStatus)}
           </Badge>
         </div>
 
@@ -347,7 +369,7 @@ const AppointmentDetail = () => {
           </Button>
         </div>
 
-        {(appointment.status === "scheduled" || appointment.status === "confirmed") && (
+        {(effectiveStatus === "scheduled" || effectiveStatus === "confirmed") && (
           <div className="flex gap-4">
             <Button
               variant="outline"

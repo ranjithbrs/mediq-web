@@ -10,6 +10,7 @@ import { AppointmentCard } from "@/components/appointments/AppointmentCard";
 import { AppointmentEmptyState } from "@/components/appointments/AppointmentEmptyState";
 import { Plus } from "lucide-react";
 import { parseLocalDateString, getTodayLocalMidnight } from "@/utils/dateUtils";
+import { getEffectiveAppointmentStatus } from "@/utils/appointmentUtils";
 
 const Appointments = () => {
   const navigate = useNavigate();
@@ -17,26 +18,20 @@ const Appointments = () => {
   const { data: appointments = [], isLoading } = useAppointments(user?.id);
 
   const filteredAppointments = useMemo(() => {
-    const today = getTodayLocalMidnight();
-
     const upcoming = appointments.filter((apt) => {
-      const aptDate = parseLocalDateString(apt.appointment_date);
-      return (
-        (apt.status === "scheduled" || apt.status === "confirmed") &&
-        aptDate >= today
-      );
+      const effectiveStatus = getEffectiveAppointmentStatus(apt);
+      return effectiveStatus === "scheduled" || effectiveStatus === "confirmed";
     });
 
     const past = appointments.filter((apt) => {
-      const aptDate = parseLocalDateString(apt.appointment_date);
-      return (
-        apt.status === "completed" ||
-        ((apt.status === "scheduled" || apt.status === "confirmed") &&
-          aptDate < today)
-      );
+      const effectiveStatus = getEffectiveAppointmentStatus(apt);
+      return effectiveStatus === "completed" || effectiveStatus === "missed";
     });
 
-    const cancelled = appointments.filter((apt) => apt.status === "cancelled");
+    const cancelled = appointments.filter((apt) => {
+      const effectiveStatus = getEffectiveAppointmentStatus(apt);
+      return effectiveStatus === "cancelled";
+    });
 
     return { upcoming, past, cancelled };
   }, [appointments]);
