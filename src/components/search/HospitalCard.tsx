@@ -33,6 +33,8 @@ export const HospitalCard = ({
             <img
               src={image}
               alt={name}
+              loading="lazy"
+              decoding="async"
               className="w-full h-full object-cover rounded-t-lg sm:rounded-l-lg sm:rounded-tr-none"
             />
           </div>

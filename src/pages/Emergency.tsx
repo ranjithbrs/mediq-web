@@ -222,6 +222,7 @@ const Emergency = () => {
 
   const resetToGPS = () => {
     manualSearchActiveRef.current = false;
+    lastOsmCoordsRef.current = null;
     setLocation(null);
     setLocationLabel(null);
     setManualQuery("");
@@ -257,11 +258,23 @@ const Emergency = () => {
     fetchDBHospitals();
   }, []);
 
-  // ── OSM hospitals ─────────────────────────────────────────────────────────
+  const lastOsmCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
     if (!location) return;
     const { lat, lng } = location;
+
+    // Avoid refetching Overpass API if user hasn't moved more than 1 km
+    if (lastOsmCoordsRef.current) {
+      const movedKm = getDistanceKm(
+        lastOsmCoordsRef.current.lat,
+        lastOsmCoordsRef.current.lng,
+        lat,
+        lng
+      );
+      if (movedKm < 1) return;
+    }
+    lastOsmCoordsRef.current = { lat, lng };
 
     const fetchOSMHospitals = async () => {
       setLoadingHospitals(true);

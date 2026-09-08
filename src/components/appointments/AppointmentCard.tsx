@@ -74,6 +74,8 @@ export const AppointmentCard = ({ appointment }: AppointmentCardProps) => {
               <img
                 src={appointment.doctors.photo}
                 alt={appointment.doctors.name}
+                loading="lazy"
+                decoding="async"
                 className="w-16 h-16 rounded-lg object-cover shrink-0"
               />
             )}
