@@ -110,7 +110,7 @@ export const useHospitalEmergencyAlerts = (hospitalId?: string) => {
 
       // 2. Optionally attempt to fetch profile info for associated patient user_ids
       const userIds = Array.from(new Set(alertsData.map((a) => a.user_id).filter(Boolean)));
-      let profilesMap = new Map<string, { full_name: string | null; phone: string | null }>();
+      const profilesMap = new Map<string, { full_name: string | null; phone: string | null }>();
 
       if (userIds.length > 0) {
         const { data: profilesData } = await supabase

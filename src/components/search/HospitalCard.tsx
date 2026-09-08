@@ -36,16 +36,16 @@ export const HospitalCard = ({
               className="w-full h-full object-cover rounded-t-lg sm:rounded-l-lg sm:rounded-tr-none"
             />
           </div>
-          <div className="flex-1 p-4">
+          <div className="flex-1 p-4 min-w-0">
             <div className="flex items-start justify-between gap-4 mb-2">
-              <div>
-                <h3 className="text-xl font-bold mb-1">{name}</h3>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-xl font-bold mb-1 truncate" title={name}>{name}</h3>
                 <div className="flex items-center text-sm text-muted-foreground gap-1 mb-2">
-                  <MapPin className="h-4 w-4" />
-                  <span>{address}, {city}</span>
+                  <MapPin className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{address}, {city}</span>
                 </div>
               </div>
-              <div className="flex items-center gap-1 bg-success/10 px-2 py-1 rounded">
+              <div className="flex items-center gap-1 bg-success/10 px-2 py-1 rounded shrink-0">
                 <Star className="h-4 w-4 fill-success text-success" />
                 <span className="font-semibold text-success">
                   {rating !== null && rating !== undefined ? rating.toFixed(1) : "0.0"}

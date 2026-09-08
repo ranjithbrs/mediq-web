@@ -1,15 +1,16 @@
-import { Home, Calendar, Search, User, Shield, Stethoscope } from "lucide-react";
+import { Home, Calendar, Search, User, Shield, Stethoscope, Building2 } from "lucide-react";
 import { NavLink as RouterNavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useUserRole } from "@/hooks/useUserRole";
 
 export const BottomNavigation = () => {
-  const { isAdmin, isDoctor, loading } = useUserRole();
+  const { isAdmin, isDoctor, isHospital, loading } = useUserRole();
 
   const navItems = [
     { to: "/", icon: Home, label: "Home" },
     ...(isAdmin ? [{ to: "/admin", icon: Shield, label: "Admin" }] : []),
     ...(isDoctor ? [{ to: "/doctor-dashboard", icon: Stethoscope, label: "Queue" }] : []),
+    ...(isHospital ? [{ to: "/hospital-dashboard", icon: Building2, label: "Hospital" }] : []),
     { to: "/appointments", icon: Calendar, label: "Appointments" },
     { to: "/search", icon: Search, label: "Search" },
     { to: "/profile", icon: User, label: "Profile" },

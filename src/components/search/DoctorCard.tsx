@@ -43,7 +43,7 @@ export const DoctorCard = ({
     <Card className="hover:shadow-lg transition-shadow">
       <CardContent className="p-4">
         <div className="flex gap-4">
-          <div className="relative">
+          <div className="relative shrink-0">
             <img
               src={photo}
               alt={name}
@@ -54,13 +54,13 @@ export const DoctorCard = ({
             </div>
           </div>
           
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2 mb-2">
-              <div>
-                <h3 className="font-bold text-lg">{name}</h3>
-                <p className="text-sm text-muted-foreground">{qualification}</p>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-bold text-lg truncate" title={name}>{name}</h3>
+                <p className="text-sm text-muted-foreground truncate">{qualification}</p>
               </div>
-              <div className="flex items-center gap-1 bg-success/10 px-2 py-1 rounded">
+              <div className="flex items-center gap-1 bg-success/10 px-2 py-1 rounded shrink-0">
                 <Star className="h-3 w-3 fill-success text-success" />
                 <span className="font-semibold text-success text-sm">
                   {rating !== null && rating !== undefined ? rating.toFixed(1) : "0.0"}
@@ -68,18 +68,18 @@ export const DoctorCard = ({
               </div>
             </div>
             
-            <Badge variant="secondary" className="mb-2">{specialization}</Badge>
+            <Badge variant="secondary" className="mb-2 max-w-full truncate">{specialization}</Badge>
             
             <div className="flex flex-wrap gap-3 text-sm text-muted-foreground mb-3">
               <div className="flex items-center gap-1">
-                <Clock className="h-4 w-4" />
+                <Clock className="h-4 w-4 shrink-0" />
                 <span>{experience} yrs exp</span>
               </div>
               <div className="font-semibold text-foreground">
                 ₹{consultationFee}
               </div>
               {hospitalName && (
-                <div className="text-xs">{hospitalName}</div>
+                <div className="text-xs truncate max-w-full" title={hospitalName}>{hospitalName}</div>
               )}
             </div>
 

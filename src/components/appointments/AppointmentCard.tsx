@@ -69,27 +69,27 @@ export const AppointmentCard = ({ appointment }: AppointmentCardProps) => {
     >
       <CardContent className="pt-6">
         <div className="flex items-start justify-between mb-4">
-          <div className="flex items-start gap-4 flex-1">
+          <div className="flex items-start gap-4 flex-1 min-w-0">
             {appointment.doctors?.photo && (
               <img
                 src={appointment.doctors.photo}
                 alt={appointment.doctors.name}
-                className="w-16 h-16 rounded-lg object-cover"
+                className="w-16 h-16 rounded-lg object-cover shrink-0"
               />
             )}
-            <div className="flex-1">
-              <h3 className="font-semibold text-lg">
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-lg truncate" title={appointment.doctors?.name}>
                 {appointment.doctors?.name}
               </h3>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground truncate">
                 {appointment.doctors?.specialization}
               </p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground truncate">
                 {appointment.hospitals?.name}
               </p>
             </div>
           </div>
-          <div className="flex items-start gap-2">
+          <div className="flex items-start gap-2 shrink-0 ml-2">
             <Badge className={getStatusColor(effectiveStatus)}>
               {getStatusLabel(effectiveStatus)}
             </Badge>
