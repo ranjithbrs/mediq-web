@@ -586,9 +586,21 @@ const Emergency = () => {
 
         {/* Nearby Hospitals */}
         <div>
-          <h2 className="text-lg font-semibold mb-1">
-            {location ? "Nearby Hospitals & Medicals" : "All Hospitals & Medicals"}
-          </h2>
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-lg font-semibold">
+              {location ? "Nearby Hospitals & Medicals" : "All Hospitals & Medicals"}
+            </h2>
+            {selectedHospital && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-muted-foreground gap-1 h-7 px-2"
+                onClick={() => handleSelectHospital(null)}
+              >
+                ✕ Clear selection
+              </Button>
+            )}
+          </div>
           {loadingHospitals ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />

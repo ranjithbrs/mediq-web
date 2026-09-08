@@ -251,7 +251,7 @@ export const EmergencyMap = ({
 
   return (
     <div className="relative rounded-lg overflow-hidden border border-border shadow-sm">
-      <div ref={containerRef} style={{ height: 300 }} className="relative z-0" />
+      <div ref={containerRef} style={{ height: 400 }} className="relative z-0" />
     </div>
   );
 };
