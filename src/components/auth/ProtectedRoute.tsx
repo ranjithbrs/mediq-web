@@ -25,6 +25,12 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   }, []);
 
   const checkAuth = async () => {
+    const demoRole = localStorage.getItem("mediq_demo_role");
+    if (demoRole) {
+      setIsAuthenticated(true);
+      setIsLoading(false);
+      return;
+    }
     const { data: { session } } = await supabase.auth.getSession();
     setIsAuthenticated(!!session);
     setIsLoading(false);

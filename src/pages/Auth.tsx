@@ -96,6 +96,15 @@ const Auth = () => {
     );
   }
 
+  const handleDemoLogin = (role: "patient" | "doctor") => {
+    localStorage.setItem("mediq_demo_role", role);
+    toast({
+      title: "Demo Mode Active",
+      description: role === "doctor" ? "Logged in as Dr. Santhosh (Doctor Queue & Dashboard)" : "Logged in as Demo Patient",
+    });
+    window.location.href = role === "doctor" ? "/doctor-dashboard" : "/";
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -581,11 +590,43 @@ const Auth = () => {
                     </div>
                   )}
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="flex flex-col gap-3">
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Login
                   </Button>
+
+                  <div className="relative w-full my-1">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t border-border" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-card px-2 text-muted-foreground font-semibold">
+                        Instant Live Demo
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 w-full">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1 border-primary/40 hover:bg-primary/10 text-xs h-9"
+                      onClick={() => handleDemoLogin("patient")}
+                    >
+                      👤 Demo Patient
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1 border-blue-500/40 hover:bg-blue-500/10 text-xs h-9"
+                      onClick={() => handleDemoLogin("doctor")}
+                    >
+                      🩺 Demo Doctor
+                    </Button>
+                  </div>
                 </CardFooter>
               </form>
             </Card>

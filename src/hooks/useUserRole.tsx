@@ -14,6 +14,14 @@ export const useUserRole = () => {
 
   useEffect(() => {
     if (authLoading) return;
+
+    const demoRole = localStorage.getItem("mediq_demo_role");
+    if (demoRole) {
+      setRoles([demoRole as AppRole]);
+      setLoading(false);
+      return;
+    }
+
     if (!user) {
       setRoles([]);
       setLoading(false);
