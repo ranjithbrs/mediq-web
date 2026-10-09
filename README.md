@@ -163,7 +163,7 @@ npx cap open android
 *Panimalar Engineering College, Chennai, India*
 
 * 🌐 **Live Application:** [mediq-web-delta.vercel.app](https://mediq-web-delta.vercel.app/auth)
-* 💼 **LinkedIn:** [linkedin.com/in/ranjith-b-csbs23](https://www.linkedin.com/in/ranjith-b-csbs23/)
+* 💼 **LinkedIn:** [linkedin.com/in/ranjith-b-csbs](https://www.linkedin.com/in/ranjith-b-csbs/)
 * 💻 **GitHub:** [@ranjithbrs](https://github.com/ranjithbrs)
 * 📧 **Email:** [ranjithb2k06@gmail.com](mailto:ranjithb2k06@gmail.com)
 
