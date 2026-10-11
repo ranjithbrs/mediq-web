@@ -20,6 +20,18 @@
 
 ---
 
+## 💡 What is MediQ in 30 Seconds? (In Plain English)
+
+Have you ever visited a hospital or clinic and had to stand in a long, crowded queue for 2 to 3 hours just to get a doctor's appointment token?
+
+**MediQ** turns your phone into a **smart hospital reception desk**:
+- 🏥 **Find Nearby Clinics:** Uses GPS to show you the closest hospitals and available specialist doctors.
+- 🎟️ **Book Instant Tokens:** Reserve your doctor consultation token from home so you don't waste hours in crowded waiting rooms.
+- 💳 **Pay Safely Online:** Pay the consultation fee securely via UPI, Card, or NetBanking with instant digital receipts.
+- 🚨 **One-Click Emergency Assistance:** Instantly locate nearest ICU beds and emergency hospital routes during urgent situations.
+
+---
+
 ## 📌 The Healthcare Challenge: Modernizing Outpatient Care
 
 Physical hospital outpatient departments (OPDs) in developing and urban environments face persistent bottlenecks:
