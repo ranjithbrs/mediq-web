@@ -215,5 +215,6 @@ All contributions authored by **Ranjith B** in this repository are verified agai
 
 ## 📜 License & Copyright Notice
 
-* **Upstream Licensing Status:** The upstream repository ([`SANTHOSH040106/mediq-web`](https://github.com/SANTHOSH040106/mediq-web)) does not currently include a root `LICENSE` file; original project ownership and foundational rights remain with creator **Santhosh M** and the MediQ co-authors.
-* **Fork Modifications & Documentation:** Contributed features, optimizations, and documentation authored in this fork are made available under the [MIT License](LICENSE) &copy; 2026 Ranjith B, Santhosh M, and MediQ Project Contributors.
+* **License:** This project and all associated documentation are distributed under the [MIT License](LICENSE).
+* **Copyright & Attribution:** Copyright &copy; 2026 Santhosh M, Ranjith B, and MediQ Project Contributors.
+* **Upstream Licensing Alignment:** Both the upstream repository ([`SANTHOSH040106/mediq-web`](https://github.com/SANTHOSH040106/mediq-web)) and this fork are unified under the official MIT License, with collaborative copyright ownership explicitly acknowledging the original creator **Santhosh M** and all project co-authors.
