@@ -20,6 +20,23 @@
 
 ---
 
+## 👥 Upstream Project & Team Attribution
+
+> [!NOTE]
+> **MediQ Web (Fork)** is developed from the upstream repository [**`SANTHOSH040106/mediq-web`**](https://github.com/SANTHOSH040106/mediq-web), conceptualized and originally created by **Santhosh M** ([@SANTHOSH040106](https://github.com/SANTHOSH040106)).
+
+* **Upstream Repository:** [`https://github.com/SANTHOSH040106/mediq-web`](https://github.com/SANTHOSH040106/mediq-web)
+* **Original Author / Lead:** Santhosh M ([@SANTHOSH040106](https://github.com/SANTHOSH040106)) — Core architecture, Supabase integration, and authentication workflows.
+* **Fork Maintainer & Contributor:** Ranjith B ([@ranjithbrs](https://github.com/ranjithbrs)) — Emergency module UI/routing, mobile layout resilience, asset lazy loading, Overpass API request throttling, demo access mode, and technical documentation.
+* **Project Team & Collaborators:**
+  * **Anusha PP** (Reg No: `721423244010`)
+  * **Ranjith B** (Reg No: `721423244049`)
+  * **Santhosh M** (Reg No: `721423244053`)
+  * **Sripriyan S** (Reg No: `721423244056`)
+* **Academic Institution:** Department of Computer Science and Business Systems (CSBS), Nehru Institute of Engineering and Technology (Autonomous), Coimbatore, Tamil Nadu, India.
+
+---
+
 ## 💡 What is MediQ in 30 Seconds? (In Plain English)
 
 Have you ever visited a hospital or clinic and had to stand in a long, crowded queue for 2 to 3 hours just to get a doctor's appointment token?
@@ -168,11 +185,26 @@ npx cap open android
 
 ---
 
-## 👤 Author & Connect
+## 🛠️ Verified Fork Contributions (by @ranjithbrs)
+
+All contributions authored by **Ranjith B** in this repository are verified against git commit diffs across both upstream and fork remotes:
+
+| Commit Hash | Branch | Contribution Scope | Key Technical Changes |
+| :---: | :---: | :--- | :--- |
+| [`11b55e6`](https://github.com/SANTHOSH040106/mediq-web/commit/11b55e6831f8ae5c903d38cf158e10ccaaf48586) | `main` | `feat(emergency)` | **Emergency Map Viewport & Route Reset:** Increased Leaflet container height (300px &rarr; 400px) in `EmergencyMap.tsx`; added `✕ Clear selection` control in `Emergency.tsx` to deselect active hospital and clear live OSRM routes. |
+| [`ba95d55`](https://github.com/SANTHOSH040106/mediq-web/commit/ba95d559368614832e67e5c8fbf5c9c60cf53132) | `main` | `fix(ui)` | **Mobile Layout Guards & Hospital Nav:** Added text truncation (`truncate`, `min-w-0`, `shrink-0`) across `DoctorCard.tsx`, `HospitalCard.tsx`, and `AppointmentCard.tsx` to prevent overflow on mobile; added Hospital Dashboard nav link (`Building2` icon) in `BottomNavigation.tsx`. |
+| [`5934ed9`](https://github.com/SANTHOSH040106/mediq-web/commit/5934ed9800773d05003a8eb6aacf5adf629fd638) | `main` | `perf` | **Asset Lazy Loading & Overpass Throttling:** Applied native browser `loading="lazy"` and `decoding="async"` across doctor/hospital card images; introduced 1 km geospatial distance threshold guard (`lastOsmCoordsRef`) in `Emergency.tsx` to prevent redundant Overpass API requests during GPS jitter. |
+| [`fa08420`](https://github.com/ranjithbrs/mediq-web/commit/fa084207fe39bbb60276c8d0612106a5675f1c66) | `demo-mode` | `feat(demo)` | **1-Click Live Demo Authentication:** Implemented decoupled client demo authentication mode in `AuthContext.tsx`, `ProtectedRoute.tsx`, `useUserRole.tsx`, and `Auth.tsx` for presentation and testing access without email verification delays. |
+| [`5e2c889`](https://github.com/ranjithbrs/mediq-web/commit/5e2c8895e68cca39830292585f093d9aa45bee11) | `main` | `docs` | **Full-Stack Technical Documentation & Architecture:** Authored complete project documentation, ASCII system architecture flow, module breakdown, and local development instructions. |
+| [`8627701`](https://github.com/ranjithbrs/mediq-web/commit/86277019579e4071a21834b25115e8c537208e0c) / [`2cdc4a4`](https://github.com/ranjithbrs/mediq-web/commit/2cdc4a4f3bc69967db4ddfe44a2280157ef246a4) | `main` | `docs` | **Documentation Polish:** Added beginner-friendly plain English overview and updated professional contact references. |
+
+---
+
+## 👤 Fork Maintainer & Contact
 
 **Ranjith B**  
 *Full-Stack Developer & CSBS Undergraduate*  
-*Panimalar Engineering College, Chennai, India*
+*Nehru Institute of Engineering and Technology, Coimbatore, India*
 
 * 🌐 **Live Application:** [mediq-web-delta.vercel.app](https://mediq-web-delta.vercel.app/auth)
 * 💼 **LinkedIn:** [linkedin.com/in/ranjith-b-csbs](https://www.linkedin.com/in/ranjith-b-csbs/)
@@ -181,6 +213,7 @@ npx cap open android
 
 ---
 
-## 📜 License
+## 📜 License & Copyright Notice
 
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+* **Upstream Licensing Status:** The upstream repository ([`SANTHOSH040106/mediq-web`](https://github.com/SANTHOSH040106/mediq-web)) does not currently include a root `LICENSE` file; original project ownership and foundational rights remain with creator **Santhosh M** and the MediQ co-authors.
+* **Fork Modifications & Documentation:** Contributed features, optimizations, and documentation authored in this fork are made available under the [MIT License](LICENSE) &copy; 2026 Ranjith B, Santhosh M, and MediQ Project Contributors.
